@@ -614,7 +614,17 @@ function gsSave(){
              selIN:selIN||null,selTV:selTV||null,curMonth:curMonth||''},
       fund:{partners:PARTNERS||[],fees:partnerFees||[]},
       monthHistory:(typeof monthHistory!=='undefined'?monthHistory:{}),
-      marketPrices:_mp,diffRangeStart:_drs,diffRangeEnd:_dre,infraBlocks:_ib};
+      marketPrices:_mp,diffRangeStart:_drs,diffRangeEnd:_dre,infraBlocks:_ib,
+      feeRows:(()=>{
+        const fr={};
+        for(let i=0;i<localStorage.length;i++){
+          const k=localStorage.key(i);
+          if(k&&(k.startsWith('sky_rows_')||k.startsWith('sky_def_'))){
+            try{fr[k]=JSON.parse(localStorage.getItem(k));}catch(e){}
+          }
+        }
+        return fr;
+      })()};
     // localStorage 즉시 백업
     try{localStorage.setItem('sky_backup',JSON.stringify(data));}catch(_){}
     // form submit으로 구글시트 저장
@@ -652,7 +662,17 @@ function gsLoad(){
         if(data.fund){if(data.fund.partners)PARTNERS=[...data.fund.partners];if(data.fund.fees)partnerFees=data.fund.fees;}
         if(data.monthHistory){monthHistory=data.monthHistory;saveMonthHistory();}
         if(data.marketPrices)marketPrices=data.marketPrices;
-        showGsStatus('✓ 구글시트 불러옴');resolve(true);
+        // 월별 상품 데이터 복원
+        if(data.feeRows){
+          Object.keys(data.feeRows).forEach(k=>{
+            try{localStorage.setItem(k,JSON.stringify(data.feeRows[k]));}catch(e){}
+          });
+        }
+        showGsStatus('✓ 구글시트 불러옴');
+        // 상품표/수수료표 재렌더링
+        loadMonthRows(curMonthKey());
+        try{renderTable();renderGrade();}catch(e){}
+        resolve(true);
       }catch(e){showGsStatus('⚠ 클라우드 없음',false);resolve(false);}
       try{document.head.removeChild(script);}catch(_){}
       delete window[cbName];
@@ -3258,6 +3278,8 @@ function saveFeeChanges(){
   _editGroups=null;
   const ym=curMonthKey();
   if(ym) saveMonthRows(ym);
+  // 구글시트에도 자동 동기화
+  if(typeof gsSaveDebounced==='function') gsSaveDebounced();
   _feeEditMode=false;
   renderTable();
   const btn=document.getElementById('fee-edit-btn');
