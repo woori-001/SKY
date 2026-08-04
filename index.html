@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SKY v12-FIX13</title>
+<title>SKY v12-CV1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
 <style>
@@ -308,8 +308,8 @@ thead th.th-pol:hover .rm-pol{display:block;}
     <div class="nav" id="nav-grade" onclick="go('grade')">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><path d="M2 13 5 9 8 10 11 5 14 3"/><circle cx="14" cy="3" r="1.2" fill="currentColor" stroke="none"/></svg>그레이드 단가
     </div>
-    <div class="nav" id="nav-analysis" onclick="go('analysis')">
-      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><path d="M2 12 6 7l3 3 2-4 3 4"/><circle cx="6" cy="7" r="1" fill="currentColor" stroke="none"/></svg>분석
+    <div class="nav" id="nav-compare" onclick="go('compare')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><path d="M2 8h5M9 8h5M8 3v10M3 5h4M9 5h4"/></svg>비교
     </div>
     <div class="nav" id="nav-result" onclick="go('result')">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M4 8h8M4 5h8M4 11h5"/></svg>실적계산
@@ -401,120 +401,36 @@ thead th.th-pol:hover .rm-pol{display:block;}
     </div>
 
     <!-- ── 분석 통합 ── -->
-    <div class="page" id="page-analysis">
+    <div class="page" id="page-compare">
+      <div style="padding:16px">
+        <div id="cmp-wrap" style="max-width:520px">
 
-      <!-- 상단: 목표 + 파일 업로드 4열 -->
-      <!-- 목표+파일 접기/펼치기 -->
-      <div style="background:#fff;border:1.5px solid var(--br);border-radius:10px;margin-bottom:14px;overflow:hidden">
-        <div onclick="(function(el){const c=el.nextElementSibling;const open=c.style.display!=='none';c.style.display=open?'none':'';el.querySelector('.an-toggle').textContent=open?'▶':'▼';})(this)"
-          style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;background:#F9FAFB;border-bottom:1px solid var(--br)">
-          <span style="font-size:11.5px;font-weight:600;color:var(--t1)">📋 목표 설정 · 파일 업로드</span>
-          <span class="an-toggle" style="font-size:11px;color:var(--t3)">▼</span>
-        </div>
-        <div class="an-collapse-body" style="padding:14px">
-      <div style="display:grid;grid-template-columns:180px 1fr 1fr 1fr;gap:10px;margin-bottom:0">
-        <!-- 목표 입력 -->
-        <div style="background:#fff;border:1.5px solid var(--br);border-radius:10px;padding:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid var(--br);padding-bottom:5px">
-            <span style="font-size:11px;font-weight:700;color:var(--t2)">목표 설정</span>
-            <input type="month" id="analysis-month-mirror"
-              style="padding:2px 5px;border:1.5px solid var(--br);border-radius:5px;font-size:10px;font-family:inherit;outline:none;color:var(--t1)"
-              onchange="document.getElementById('month-in').value=this.value;setMonth();calcGoal()">
-          </div>
-          <div style="display:flex;flex-direction:column;gap:7px">
-            <div style="display:flex;align-items:center;gap:7px">
-              <span style="font-size:11px;font-weight:600;color:var(--t2);min-width:38px">인터넷</span>
-              <input type="number" id="goalIN" placeholder="0" min="0" step="50" oninput="calcGoal()"
-                style="width:68px;padding:5px 7px;border:1.5px solid var(--br);border-radius:6px;font-size:12px;font-family:var(--num-font);outline:none;color:var(--t1)">
-              <span style="font-size:10px;color:var(--t3)">건</span>
+          <!-- 헤더 -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--t1)">수수료 비교</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px">우리 수수료 vs 시장단가</div>
             </div>
-            <div style="display:flex;align-items:center;gap:7px">
-              <span style="font-size:11px;font-weight:600;color:var(--t2);min-width:38px">TV</span>
-              <input type="number" id="goalTV" placeholder="0" min="0" step="50" oninput="calcGoal()"
-                style="width:68px;padding:5px 7px;border:1.5px solid var(--br);border-radius:6px;font-size:12px;font-family:var(--num-font);outline:none;color:var(--t1)">
-              <span style="font-size:10px;color:var(--t3)">건</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-o sm" onclick="saveMarketPrices()">💾 저장</button>
+              <button class="btn btn-o sm" onclick="saveCompareImage()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="11" rx="2"/><circle cx="6" cy="8" r="1.8"/><path d="M1 11l3-3 3 3 3-4 4 5"/></svg>이미지
+              </button>
             </div>
-            <div style="display:flex;align-items:center;gap:7px">
-              <span style="font-size:11px;font-weight:600;color:var(--t2);min-width:38px">유심</span>
-              <input type="number" id="goalUSIM" placeholder="0" min="0" step="50" oninput="calcGoal()"
-                style="width:68px;padding:5px 7px;border:1.5px solid var(--br);border-radius:6px;font-size:12px;font-family:var(--num-font);outline:none;color:var(--t1)">
-              <span style="font-size:10px;color:var(--t3)">건</span>
-            </div>
-            <div style="font-size:10px;color:var(--t3);margin-top:2px">그레이드 선택값 자동 반영</div>
-
           </div>
-        </div>
-        <!-- 정산 파일 (유선+무선 통합) -->
-        <div style="background:#fff;border:1.5px solid var(--br);border-radius:10px;padding:12px">
-          <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:3px">정산 파일 업로드</div>
-          <div style="font-size:10px;color:var(--t3);margin-bottom:8px">유선·무선 동시 선택 가능 · 분석월 자동 감지</div>
-          <div class="dz" id="an-dz-wire" style="padding:14px 10px"
-            onclick="document.getElementById('fileIn2').click()"
-            ondragover="this.classList.add('drag-over');event.preventDefault()"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="this.classList.remove('drag-over');handleSettleMulti({target:{files:event.dataTransfer.files}});event.preventDefault()">
-            <div style="font-size:11px;font-weight:600;color:var(--t2)">클릭 또는 드래그</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:3px">유선_전체정산관리.xlsx / 무선_전체정산관리.xlsx (동시 선택 가능)</div>
+
+          <!-- 그레이드 정보 -->
+          <div id="cmp-grade-info" style="font-size:11px;color:var(--t3);margin-bottom:10px;padding:7px 10px;background:#EFF6FF;border-radius:6px;border:1px solid #BFDBFE"></div>
+
+          <!-- 비교표 -->
+          <div id="cmp-table-wrap">
+            <div style="text-align:center;padding:40px;color:var(--t3);font-size:12px">수수료표 데이터를 불러오는 중...</div>
           </div>
-          <input type="file" id="fileIn2" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="handleSettleMulti(event)">
-          <div id="fileResult2" style="margin-top:7px;font-size:11px;min-height:18px"></div>
-        </div>
-        <!-- 협력점 수수료 파일 -->
-        <div style="background:#fff;border:1.5px solid var(--br);border-radius:10px;padding:12px">
-          <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:3px">협력점 수수료 파일</div>
-          <div style="font-size:10px;color:var(--t3);margin-bottom:8px">협력점별 본사수수료 자동 입력</div>
-          <div class="dz" id="an-dz-partner" style="padding:14px 10px"
-            onclick="document.getElementById('fileIn_pf').click()"
-            ondragover="dzOver(event,this)" ondragleave="dzLeave(this)" ondrop="dzDropPartner(event,this)">
-            <input type="file" id="fileIn_pf" accept=".xlsx,.xls" style="display:none" onchange="handlePartnerFeeFile(event)">
-            <div style="font-size:11px;font-weight:600;color:var(--t2)">클릭 또는 드래그</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:3px">xlsx · xls</div>
-          </div>
-          <div id="partnerFeeFileResult" style="margin-top:7px;font-size:11px;min-height:18px"></div>
+
         </div>
       </div>
-        </div>
-      </div>
+    </div><!-- /page-compare -->
 
-      <!-- 달성현황 + 개통손익 2열 -->
-      <div style="display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.5fr);gap:14px;align-items:start;margin-bottom:14px">
-        <!-- 좌: 달성현황 (좁게) -->
-        <div id="goalStatus"></div>
-        <!-- 우: 개통 손익 현황 -->
-        <div id="simTable"></div>
-      </div>
-
-      <!-- 협력점 관리 -->
-      <div style="background:#fff;border:1.5px solid var(--br);border-radius:10px;padding:14px;margin-top:14px">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-          <span style="font-size:12px;font-weight:700;color:var(--t1)">협력점 관리</span>
-          <div id="partnerTagArea" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
-          <input id="newPartnerInput" type="text" placeholder="협력점명"
-            style="padding:4px 8px;border:1.5px solid var(--br);border-radius:6px;font-size:11px;font-family:inherit;outline:none;width:100px"
-            onkeydown="if(event.key==='Enter')document.getElementById('addPartnerBtn').click()"
-          >
-          <button id="addPartnerBtn" class="btn btn-p sm" onclick="(function(){const v=document.getElementById('newPartnerInput').value.trim();if(v&&!PARTNERS.includes(v)){PARTNERS.push(v);partnerFees.forEach(r=>r.push(0));saveFundingData();renderPartnerTags();renderMainFundTable();renderFundSimTable();document.getElementById('newPartnerInput').value='';}else if(!v){alert('협력점명을 입력해주세요');}else{alert('이미 존재하는 협력점입니다');}})()">+ 추가</button>
-          <button class="btn btn-o sm" onclick="if(confirm('협력점 데이터를 초기화할까요?')){PARTNERS=['티에스','타임','엠투엠','라온','유픽','보라','엘케이','아진','유아이','BCY'];partnerFees=FUND_ROWS.map(()=>PARTNERS.map(()=>0));saveFundingData();renderPartnerTags();renderMainFundTable();renderFundSimTable();}">초기화</button>
-        </div>
-        <!-- 협력점별 펀딩현황 -->
-        <div id="feeInputArea" style="overflow-x:auto;max-width:100%"></div>
-      </div>
-
-      <!-- 실적기반 손익현황 -->
-      <div id="settleSummaryArea"></div>
-
-      <!-- 월별 누적 현황 -->
-      <div style="background:#fff;border:1px solid var(--br);border-radius:8px;overflow:hidden;margin-top:14px">
-        <div style="padding:8px 13px;background:#F8FAFC;border-bottom:1px solid var(--br);font-size:11.5px;font-weight:700;color:var(--t1);display:flex;align-items:center;justify-content:space-between">
-          <span>월별 누적 현황</span>
-          <span style="font-size:10px;font-weight:400;color:var(--t3)">파일 업로드 시 자동 저장 · 전월 대비 증감 표시</span>
-        </div>
-        <div id="monthHistoryArea"></div>
-      </div>
-
-    </div>
-
-    <!-- ── 실적계산 ── -->
     <div class="page" id="page-result">
       <!-- 파일 업로드 -->
       <div style="background:#fff;border:1px solid var(--br);border-radius:8px;overflow:hidden;margin-bottom:14px">
@@ -588,11 +504,149 @@ thead th.th-pol:hover .rm-pol{display:block;}
     <!-- ── 펀딩 ── -->
     <div class="page" id="page-funding">
       <div style="padding:16px;text-align:center;color:var(--t3)">펀딩 페이지</div>
-    <
+    </div>
+    <!-- /page-funding -->
 
-<script>
-const GS_URL='https://script.google.com/macros/s/AKfycbw2V3zJ4b8lbb2Bl7ra1mLLqhcdduVB30sJN5Q8T9hHSOyelDwWYHsdJUnFmNG1E8IQ/exec';
-let _gsSaveTimer=null;
+  </div>
+  <!-- /content -->
+</div>
+<!-- /main -->
+</div>
+<!-- /app -->
+
+<script>const GS_URL='https://script.google.com/macros/s/AKfycbw2V3zJ4b8lbb2Bl7ra1mLLqhcdduVB30sJN5Q8T9hHSOyelDwWYHsdJUnFmNG1E8IQ/exec';
+async function saveCompareImage(){
+  // _cmpData 없으면 자동 수집
+  if(!window._cmpData||!window._cmpData.length){
+    try{ renderCompare(); }catch(e){}
+  }
+  if(!window._cmpData||!window._cmpData.length){
+    alert('비교 탭에 데이터가 없어요. 비교 탭을 먼저 열어주세요.');return;
+  }
+  const data=window._cmpData;
+  const grSel=typeof selIN!=='undefined'&&selIN?selIN+'건 기준':'';
+  const fmt=n=>n?n.toLocaleString()+'원':'—';
+  const S=2;
+  // TV 상품명 폭 동적 계산 (긴 이름이 옆 컬럼과 겹치거나 잘리지 않도록)
+  const meas=document.createElement('canvas').getContext('2d');
+  meas.font='bold 11px sans-serif';
+  const TV_MIN=100, TV_MAX=190, TV_PAD=16;
+  let tvNeed=TV_MIN;
+  data.forEach(g=>g.rows.forEach(r=>{
+    const w=meas.measureText(r.tv||'').width+TV_PAD;
+    if(w>tvNeed) tvNeed=w;
+  }));
+  const CW0=Math.min(TV_MAX, Math.ceil(tvNeed));
+  const W=520+(CW0-TV_MIN);
+  // 셀/타이틀 폭을 넘으면 폰트를 줄이고, 그래도 안 맞으면 말줄임표(…) 처리
+  function fitText(ctx, text, maxWidth, size, bold){
+    const mk=s=>`${bold?'bold ':''}${s}px sans-serif`;
+    ctx.font=mk(size);
+    while(ctx.measureText(text).width>maxWidth && size>8){
+      size-=0.5;
+      ctx.font=mk(size);
+    }
+    if(ctx.measureText(text).width<=maxWidth) return {text, font:ctx.font};
+    let t=text;
+    while(t.length>1 && ctx.measureText(t+'…').width>maxWidth){ t=t.slice(0,-1); }
+    return {text:t+'…', font:ctx.font};
+  }
+  const fitTvText=(ctx,text,maxWidth)=>fitText(ctx,text,maxWidth,11,true);
+  // 높이 계산
+  const LABEL_H=34, TBL_HDR_H=28, ROW_H=36, GAP=14;
+  let H=20+56;
+  if(gradeU>0) H+=44;
+  data.forEach(g=>{ H+=LABEL_H+TBL_HDR_H+g.rows.length*ROW_H+GAP; });
+  H+=20;
+  const cv=document.createElement('canvas');
+  cv.width=W*S; cv.height=H*S;
+  const c=cv.getContext('2d');
+  c.scale(S,S);
+  c.fillStyle='#F8F9FB'; c.fillRect(0,0,W,H);
+  let y=20;
+  // 제목
+  c.fillStyle='#111827'; c.font='bold 15px sans-serif';
+  c.fillText('수수료 비교',20,y+15); y+=20;
+  c.fillStyle='#6B7280'; c.font='11px sans-serif';
+  c.fillText('우리 수수료 vs 시장단가',20,y+13); y+=20;
+  // 그레이드
+  if(gradeU>0){
+    y+=8;
+    c.fillStyle='#EFF6FF'; c.strokeStyle='#BFDBFE'; c.lineWidth=1;
+    c.beginPath(); c.roundRect(20,y,W-40,30,6); c.fill(); c.stroke();
+    c.fillStyle='#1D4ED8'; c.font='11px sans-serif';
+    const t1='현재 그레이드: '; c.fillText(t1,28,y+19);
+    const w1=c.measureText(t1).width;
+    c.font='bold 11px sans-serif'; c.fillText(grSel,28+w1,y+19);
+    const w2=c.measureText(grSel).width;
+    c.fillStyle='#4B5563'; c.font='11px sans-serif';
+    c.fillText('  (합산 +'+gradeU.toLocaleString()+'원 포함)',28+w1+w2,y+19);
+    y+=44;
+  } else { y+=8; }
+  // 컬럼 설정
+  const CW=[CW0,55,115,115,95];
+  const CX=[20]; CW.forEach((w,i)=>CX.push(CX[i]+w));
+  const HDR=['TV 상품','인터넷','우리 수수료','시장단가','차이'];
+  data.forEach(g=>{
+    if(!g.rows.length) return;
+    const cardH=LABEL_H+TBL_HDR_H+g.rows.length*ROW_H;
+    // 카드 배경
+    c.fillStyle='#fff'; c.strokeStyle='#E2E8F0'; c.lineWidth=1;
+    c.beginPath(); c.roundRect(20,y,W-40,cardH,8); c.fill(); c.stroke();
+    // 그룹 헤더 배경
+    c.fillStyle='#F8FAFC';
+    c.beginPath(); c.roundRect(20,y,W-40,LABEL_H,[8,8,0,0]); c.fill();
+    c.strokeStyle='#E2E8F0'; c.lineWidth=0.5;
+    c.beginPath(); c.moveTo(20,y+LABEL_H); c.lineTo(W-20,y+LABEL_H); c.stroke();
+    c.fillStyle='#1558CC'; c.textAlign='left';
+    const labelFit=fitText(c, g.label, W-60, 12, true);
+    c.font=labelFit.font;
+    c.fillText(labelFit.text,30,y+LABEL_H/2+4);
+    y+=LABEL_H;
+    // 테이블 헤더
+    c.fillStyle='#F8FAFC'; c.fillRect(21,y,W-42,TBL_HDR_H);
+    c.strokeStyle='#E2E8F0'; c.lineWidth=0.5;
+    c.beginPath(); c.moveTo(21,y+TBL_HDR_H); c.lineTo(21+ (W-44),y+TBL_HDR_H); c.stroke();
+    HDR.forEach((h,i)=>{
+      c.fillStyle='#6B7280'; c.font='10px sans-serif';
+      c.textAlign=i>=2?'right':'left';
+      c.fillText(h,i>=2?CX[i]+CW[i]-6:CX[i]+6,y+18);
+    });
+    c.textAlign='left'; y+=TBL_HDR_H;
+    // 데이터 행
+    g.rows.forEach((r,ri)=>{
+      c.fillStyle=ri%2===0?'#fff':'#F9FAFB'; c.fillRect(21,y,W-42,ROW_H);
+      c.strokeStyle='#F1F5F9'; c.lineWidth=0.5;
+      c.beginPath(); c.moveTo(21,y+ROW_H); c.lineTo(W-21,y+ROW_H); c.stroke();
+      // TV 배경
+      c.fillStyle='#F8FAFC'; c.fillRect(21,y,CW[0],ROW_H);
+      c.strokeStyle='#E2E8F0'; c.lineWidth=0.5;
+      c.beginPath(); c.moveTo(21+CW[0],y); c.lineTo(21+CW[0],y+ROW_H); c.stroke();
+      // TV 상품명 텍스트 (셀 폭에 맞춰 자동 축소/말줄임표 - 옆 컬럼과 겹쳐 잘려 보이던 문제 수정)
+      c.fillStyle='#374151'; c.textAlign='left';
+      const fitted=fitTvText(c, r.tv||'', CW[0]-14);
+      c.font=fitted.font;
+      c.fillText(fitted.text,28,y+22);
+      c.font='11px sans-serif'; c.textAlign='center';
+      c.fillText(r.in,CX[1]+CW[1]/2,y+22);
+      c.fillStyle='#111827'; c.font='bold 11px monospace'; c.textAlign='right';
+      c.fillText(fmt(r.ourFee),CX[2]+CW[2]-6,y+22);
+      c.fillStyle='#374151'; c.font='11px monospace';
+      c.fillText(r.mkt?r.mkt.toLocaleString()+'원':'—',CX[3]+CW[3]-6,y+22);
+      let dt='미입력',dc='#94A3B8';
+      if(r.mkt){const d=r.ourFee-r.mkt;dt=(d>0?'+':'')+d.toLocaleString()+'원';dc=d>0?'#1D4ED8':d<0?'#DC2626':'#64748B';}
+      c.fillStyle=dc; c.font='bold 11px monospace'; c.textAlign='center';
+      c.fillText(dt,CX[4]+CW[4]/2,y+22);
+      y+=ROW_H;
+    });
+    y+=GAP;
+  });
+  c.textAlign='left';
+  const a=document.createElement('a');
+  const mth=(curMonth||'').replace(/[년월\s]/g,'');
+  a.download='수수료비교_'+mth+'.jpg';
+  a.href=cv.toDataURL('image/jpeg',0.92); a.click();
+}
 function showGsStatus(msg,ok=true){const el=document.getElementById('save-status');if(!el)return;el.textContent=msg;el.style.opacity='1';el.style.color=ok?'':'#EF4444';clearTimeout(window._saveStatusTimer);window._saveStatusTimer=setTimeout(()=>{el.style.opacity='0';el.style.color='';},3000);}
 function gsSaveDebounced(){clearTimeout(_gsSaveTimer);_gsSaveTimer=setTimeout(gsSave,1500);}
 function gsSave(){
@@ -614,7 +668,7 @@ function gsSave(){
              selIN:selIN||null,selTV:selTV||null,curMonth:curMonth||''},
       fund:{partners:PARTNERS||[],fees:partnerFees||[]},
       monthHistory:(typeof monthHistory!=='undefined'?monthHistory:{}),
-      marketPrices:_mp,diffRangeStart:_drs,diffRangeEnd:_dre,infraBlocks:_ib,
+      marketPrices:_mp,cmpMarket:(typeof marketPriceData!=='undefined'?marketPriceData:{}),diffRangeStart:_drs,diffRangeEnd:_dre,infraBlocks:_ib,
       feeRows:(()=>{
         const fr={};
         for(let i=0;i<localStorage.length;i++){
@@ -662,13 +716,15 @@ function gsLoad(){
         if(data.fund){if(data.fund.partners)PARTNERS=[...data.fund.partners];if(data.fund.fees)partnerFees=data.fund.fees;}
         if(data.monthHistory){monthHistory=data.monthHistory;saveMonthHistory();}
         if(data.marketPrices)marketPrices=data.marketPrices;
+        if(data.cmpMarket){marketPriceData=data.cmpMarket;try{localStorage.setItem('sky_market_prices',JSON.stringify(marketPriceData));}catch(e){}}
         // 월별 상품 데이터 복원
         if(data.feeRows){
           Object.keys(data.feeRows).forEach(k=>{
             try{localStorage.setItem(k,JSON.stringify(data.feeRows[k]));}catch(e){}
           });
         }
-        showGsStatus('✓ 구글시트 불러옴');
+        const _feeCount=data.feeRows?Object.keys(data.feeRows).filter(k=>k.startsWith('sky_rows_')).length:0;
+        showGsStatus('✓ 구글시트 불러옴'+(_feeCount>0?' (수수료표 '+_feeCount+'개월)':''));
         // 상품표/수수료표 재렌더링
         loadMonthRows(curMonthKey());
         try{renderTable();renderGrade();}catch(e){}
@@ -1540,17 +1596,21 @@ async function setMonth(){
   renderTable(); renderGrade();
   try{localStorage.setItem('sky_lastMonth',newV);}catch(e){}
 }
-const PL={table:'수수료표',grade:'그레이드 단가',analysis:'분석',result:'실적계산'};
+const PL={table:'수수료표',grade:'그레이드 단가',compare:'비교',result:'실적계산'};
 function go(pg){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
-  document.getElementById('page-'+pg).classList.add('on');
-  document.getElementById('nav-'+pg).classList.add('on');
-  document.getElementById('tb-title').textContent=PL[pg]||pg;
-  if(pg==='table')renderTable();
+  const pageEl=document.getElementById('page-'+pg);
+  const navEl=document.getElementById('nav-'+pg);
+  if(pageEl) pageEl.classList.add('on');
+  if(navEl) navEl.classList.add('on');
+  const titleEl=document.getElementById('tb-title');
+  if(titleEl) titleEl.textContent=PL[pg]||pg;
+  if(pg==='table') renderTable();
   if(pg==='grade'){renderGrade();renderDiffTable(selIN||0,selTV||0);}
-  if(pg==='analysis')renderAnalysisPage();
+  if(pg==='compare') initCompare();
 }
+
 function moOpen(){document.getElementById('modal').classList.add('open');}
 function moClose(){document.getElementById('modal').classList.remove('open');}
 function moOut(e){if(e.target===document.getElementById('modal'))moClose();}
@@ -3190,11 +3250,6 @@ function saveMonthRows(ym){
     localStorage.setItem('sky_def_'+ym,  JSON.stringify(DEF));
   }catch(e){}
 }
-function curMonthKey(){
-  if(!curMonth)return '';
-  const m=curMonth.match(/(\d+)년\s*(\d+)월/);
-  return m?m[1]+'-'+String(m[2]).padStart(2,'0'):'';
-}
 
 function delFeeRow(i){
   if(!window._editRows)return;
@@ -3278,14 +3333,16 @@ function saveFeeChanges(){
   _editGroups=null;
   const ym=curMonthKey();
   if(ym) saveMonthRows(ym);
-  // 구글시트에도 자동 동기화
-  if(typeof gsSaveDebounced==='function') gsSaveDebounced();
+  // 구글시트 즉시 저장 (수수료표는 중요 데이터)
+  try{ gsSave(); }catch(e){}
   _feeEditMode=false;
   renderTable();
   const btn=document.getElementById('fee-edit-btn');
   if(btn){btn.textContent='✏️ 상품 편집';btn.style.background='';btn.style.color='';}
   document.getElementById('fee-edit-hint')&&(document.getElementById('fee-edit-hint').style.display='none');
-  showToast((ym||'현재 월')+' 상품 저장 완료!');
+  const _now=new Date();
+  const _ts=_now.getHours()+'시'+_now.getMinutes()+'분';
+  showToast((ym||'현재 월')+' 저장 완료 ('+_ts+') ☁ 구글시트 동기화 중...');
 }
 
 function resetFeeToBase(){
@@ -3585,6 +3642,196 @@ function exportFeeTableToExcel(){
   XLSX.utils.book_append_sheet(wb,ws,curMonth||'수수료표');
   XLSX.writeFile(wb,'SKY_수수료표_'+mth+'.xlsx');
 }
+
+// ═══════════════════════════════
+//  수수료 비교 페이지
+// ═══════════════════════════════
+let marketPriceData = {};  // 시장단가 저장
+
+// 비교 대상 그룹 (홈30%IPTV, 일반번들IPTV)
+const CMP_GROUPS = [
+  {secKey:'번들\nIPTV', catKey:'홈30%',   label:'번들 IPTV · 홈30%'},
+  {secKey:'번들\nIPTV', catKey:'사은품형', label:'번들 IPTV · 일반(사은품형)'},
+];
+
+function initCompare(){
+  // localStorage에서 시장단가 로드
+  try{
+    const saved = localStorage.getItem('sky_market_prices');
+    if(saved) marketPriceData = JSON.parse(saved);
+  }catch(e){}
+
+  // 기준건수 드롭다운 초기화 (그레이드 단가표 행 기반)
+  initGradeSel();
+  renderCompare();
+}
+
+function initGradeSel(){
+  const sel = document.getElementById('cmp-grade-sel');
+  if(!sel) return;
+  // diffRangeStart/End/Cnt에서 단계 계산 (그레이드 단가 탭과 동일)
+  const s = typeof diffRangeStart!=='undefined'?diffRangeStart:100;
+  const e = typeof diffRangeEnd!=='undefined'?diffRangeEnd:300;
+  const cnt = typeof diffRangeCnt!=='undefined'?diffRangeCnt:5;
+  const cnts = [];
+  for(let i=0;i<cnt;i++){
+    cnts.push(Math.round(s+(e-s)*i/(cnt-1)));
+  }
+  sel.innerHTML = cnts.map(c=>`<option value="${c}">${c}</option>`).join('');
+  // 기본값: 목표건수 또는 가장 가까운 단계
+  const target = parseInt(document.getElementById('goalIN')?.value)||200;
+  const best = cnts.reduce((a,b)=>Math.abs(b-target)<Math.abs(a-target)?b:a, cnts[0]);
+  sel.value = best;
+}
+
+function getOurFee(rowIdx){
+  // getVal 함수로 실제 수수료 합산 (renderTable과 동일)
+  if(typeof getVal !== 'function' || typeof policies === 'undefined') return 0;
+  const activePols = policies.filter(p=>p.apply);
+  const tot = activePols
+    .filter(p=>!p.name||!p.name.includes('상품권'))
+    .reduce((s,p)=>s+getVal(p.id, rowIdx), 0);
+
+  // 그레이드 단가 - 기준건수에 맞는 단가
+  const sel = document.getElementById('cmp-grade-sel');
+  const targetCnt = parseInt(sel?.value)||200;
+  const grade = getGradeByCount(targetCnt, rowIdx);
+  return tot + grade;
+}
+
+function getGradeByCount(cnt, rowIdx){
+  // 선택 건수 기준 그레이드 단가 = 현재 gradeU를 그대로 반환
+  // (그레이드 단가는 goal 목표 달성 여부에 따라 결정되므로 현재 설정값 사용)
+  let curSec = '';
+  for(let i=0; i<=rowIdx; i++){
+    if(ROWS[i] && ROWS[i].sec !== null) curSec = ROWS[i].sec || '';
+  }
+  if(curSec.includes('인터넷')) return gradeInU||0;
+  if(curSec.includes('TV 단독')||curSec.includes('2ndTV')) return gradeTvU||0;
+  return gradeU||0;
+}
+
+function renderCompare(){
+  const wrap = document.getElementById('cmp-table-wrap');
+  if(!wrap) return;
+  // 현재 그레이드 정보 표시
+  const gradeEl = document.getElementById('cmp-grade-info');
+  if(gradeEl){
+    const FN2='font-family:var(--num-font);font-variant-numeric:tabular-nums';
+    const _grSel = typeof selIN!=='undefined'&&selIN?selIN:null;
+    const gi = gradeU>0
+      ? `현재 그레이드: <b>${_grSel?_grSel+'건 기준':'단가 적용 중'}</b>&nbsp;&nbsp;<span style="${FN2};color:var(--t2)">(합산 +${gradeU.toLocaleString()}원 포함)</span>`
+      : '그레이드 미설정 (달성현황 목표 입력 후 반영됩니다)';
+    gradeEl.innerHTML = gi;
+  }
+  const FN = 'font-family:var(--num-font);font-variant-numeric:tabular-nums';
+  const fmt = n => n ? n.toLocaleString()+'원' : '—';
+  const diffCell = (diff, mktPrice) => {
+    if(!mktPrice) return '<span style="color:var(--t3);font-size:11px">미입력</span>';
+    const color = diff>0?'#1D4ED8':diff<0?'#DC2626':'#64748B';
+    const sign  = diff>0?'+':'';
+    return `<span style="${FN};color:${color};font-weight:700">${sign}${diff.toLocaleString()}원</span>`;
+  };
+
+  // ROWS에서 그룹별 행 수집 (sec/cat/tv 상속 처리)
+  let curSec='', curCat='', curTv='';
+  const allRows = [];
+  ROWS.forEach((r,i)=>{
+    if(r.sec!==null && r.sec!==undefined) curSec=r.sec;
+    if(r.cat!==null && r.cat!==undefined) curCat=r.cat;
+    if(r.tv!==null && r.tv!==undefined && r.tv!=='') curTv=r.tv;
+    else if(r.tv===null||r.tv==='') {}
+    if(r.sec!==null || r.tv!==null) curTv = r.tv||curTv;
+    allRows.push({sec:curSec, cat:curCat, tv:curTv, in:r.in||'', rowIdx:i, isNewTv:r.tv!==null&&r.tv!==undefined&&r.tv!==''});
+  });
+
+  const groups = CMP_GROUPS.map(g=>{
+    const rows = allRows.filter(r=>r.sec===g.secKey && r.cat===g.catKey && r.in);
+    return {...g, rows};
+  }).filter(g=>g.rows.length);
+  window._cmpData=groups.map(g=>({label:g.label,catKey:g.catKey,
+    rows:g.rows.map(r=>({tv:r.tv,in:r.in,ourFee:getOurFee(r.rowIdx),
+    mkt:marketPriceData[g.catKey+'_'+r.tv+'_'+r.in]||0}))}));
+  if(!groups.length){
+    wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3);font-size:12px">수수료표에서 번들 IPTV 데이터를 찾을 수 없어요</div>';
+    return;
+  }
+
+
+
+  let html = `<div id="cmp-content">`;
+
+  groups.forEach(g=>{
+    // TV별 rowspan 계산
+    const tvSpans = {};
+    g.rows.forEach(r=>{
+      if(!tvSpans[r.tv]) tvSpans[r.tv] = {count:0, firstIdx:-1};
+      tvSpans[r.tv].count++;
+      if(tvSpans[r.tv].firstIdx<0) tvSpans[r.tv].firstIdx=g.rows.indexOf(r);
+    });
+    const tvRendered = {};
+
+    html += `<div style="background:#fff;border:1px solid var(--br);border-radius:10px;overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 16px;background:#F8FAFC;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--bd)">${g.label}</span>
+
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#F8FAFC;font-size:11px;color:var(--t3);text-align:center">
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br);text-align:left">TV 상품</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">인터넷</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">우리 수수료</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">시장단가</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">차이</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    g.rows.forEach((r, ri)=>{
+      const ourFee = getOurFee(r.rowIdx);
+      const mKey   = `${g.catKey}_${r.tv}_${r.in}`;
+      const mkt    = marketPriceData[mKey]||0;
+      const diff   = ourFee - mkt;
+      const bg     = ri%2===0?'#fff':'#F9FAFB';
+      const isFirstTv = !tvRendered[r.tv];
+
+      let tvCell = '';
+      if(isFirstTv){
+        tvRendered[r.tv] = true;
+        const span = tvSpans[r.tv]?.count||1;
+        tvCell = `<td rowspan="${span}" style="padding:7px 8px;border-bottom:1px solid #F1F5F9;font-size:12px;font-weight:600;vertical-align:middle;background:#F8FAFC;border-right:1px solid var(--br)">${r.tv||'—'}</td>`;
+      }
+
+      html += `<tr style="background:${bg}">
+        ${tvCell}
+        <td style="padding:7px 8px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:12px">${r.in}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #F1F5F9;text-align:right;${FN};font-size:12px;font-weight:600;color:var(--t1)">${fmt(ourFee)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #F1F5F9;text-align:center">
+          <input type="number" value="${mkt||''}" placeholder="입력"
+            onchange="marketPriceData['${mKey}']=parseInt(this.value)||0;renderCompare()"
+            style="width:110px;padding:4px 8px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;text-align:right;${FN}">
+        </td>
+        <td style="padding:7px 8px;border-bottom:1px solid #F1F5F9;text-align:center">${diffCell(diff,mkt)}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  });
+
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function saveMarketPrices(){
+  try{
+    localStorage.setItem('sky_market_prices', JSON.stringify(marketPriceData));
+    showToast('시장단가 저장 완료!');
+    // 구글시트에도 동기화
+    try{ gsSave(); }catch(e){}
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
 </script>
 </body>
 </html>
