@@ -586,7 +586,7 @@ async function saveCompareImage(){
   // 컬럼 설정
   const CW=[CW0,55,115,115,95];
   const CX=[20]; CW.forEach((w,i)=>CX.push(CX[i]+w));
-  const HDR=['TV 상품','인터넷','우리 수수료','시장단가','차이'];
+  const HDR=['TV 상품','인터넷','우리수수료(포함)','시장단가','차이'];
   data.forEach(g=>{
     if(!g.rows.length) return;
     const cardH=LABEL_H+TBL_HDR_H+g.rows.length*ROW_H;
@@ -3715,7 +3715,10 @@ function getOurFee(rowIdx){
   const sel = document.getElementById('cmp-grade-sel');
   const targetCnt = parseInt(sel?.value)||200;
   const grade = getGradeByCount(targetCnt, rowIdx);
-  return tot + grade;
+
+  // 상품권 포함가 - 해당 행의 상품권 금액을 더함
+  const gift = (typeof giftVals!=='undefined' && giftVals[rowIdx]) ? giftVals[rowIdx] : 0;
+  return tot + grade + gift;
 }
 
 function getGradeByCount(cnt, rowIdx){
@@ -3800,7 +3803,7 @@ function renderCompare(){
           <tr style="background:#F8FAFC;font-size:11px;color:var(--t3);text-align:center">
             <th style="padding:7px 8px;border-bottom:1px solid var(--br);text-align:left">TV 상품</th>
             <th style="padding:7px 8px;border-bottom:1px solid var(--br)">인터넷</th>
-            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">우리 수수료</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--br)">우리 수수료<br><span style="font-size:9px;color:var(--t3);font-weight:400">(상품권 포함)</span></th>
             <th style="padding:7px 8px;border-bottom:1px solid var(--br)">시장단가</th>
             <th style="padding:7px 8px;border-bottom:1px solid var(--br)">차이</th>
           </tr>
