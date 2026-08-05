@@ -105,10 +105,10 @@ tbody tr:hover .c-pol{background:#F2F5FA;}
 .c-grade{background:#EBF3FF!important;text-align:right!important;font-family:var(--num-font);font-size:12px!important;color:var(--bd)!important;font-weight:700!important;font-variant-numeric:tabular-nums;}
 
 /* 수수료 합계 — hover 와도 절대 안 바뀜 */
-.c-tot-gift{background:#5585D9!important;color:#EEF5FF!important;text-align:right!important;font-family:var(--num-font);font-size:12.5px!important;font-weight:700!important;font-variant-numeric:tabular-nums;border-left:1px solid rgba(255,255,255,.1)!important;}
-tbody tr:hover .c-tot-gift{background:#4A77CE!important;}
-.c-tot{background:#1a2d5a!important;color:#fff!important;text-align:right!important;font-family:var(--num-font);font-size:13px!important;font-weight:700!important;font-variant-numeric:tabular-nums;border-left:2px solid rgba(255,255,255,.1)!important;}
-tbody tr:hover .c-tot{background:#243d6a!important;color:#fff!important;}
+.c-tot-gift{background:#EFF4FC!important;color:#2B5797!important;text-align:right!important;font-family:var(--num-font);font-size:12.5px!important;font-weight:700!important;font-variant-numeric:tabular-nums;border-left:1px solid var(--br)!important;}
+tbody tr:hover .c-tot-gift{background:#E3EAF7!important;}
+.c-tot{background:#E4ECFB!important;color:#1E3A6E!important;text-align:right!important;font-family:var(--num-font);font-size:13px!important;font-weight:700!important;font-variant-numeric:tabular-nums;border-left:2px solid var(--bd)!important;}
+tbody tr:hover .c-tot{background:#D3E0F7!important;color:#1E3A6E!important;}
 
 /* 섹션 구분선 */
 tr.sec-top td{border-top:1.5px solid #D8E2F0!important;}
@@ -1075,15 +1075,18 @@ function renderTable(){
       tr+=`<td class="c-grade">${rowGrade?rowGrade.toLocaleString():'-'}</td>`;
     }
 
-    tr+=`<td class="c-tot">${(Math.floor(tot/100)*100).toLocaleString()}</td>`;
+    const totEx=Math.floor(tot/100)*100;
+    const totInc=Math.floor((tot+(gv||0))/100)*100;
+    tr+=`<td class="c-tot">${totEx.toLocaleString()}</td>`;
+    tr+=`<td class="c-tot-gift">${totInc.toLocaleString()}</td>`;
     tr+='</tr>';
     tbody+=tr;
   });
 
   if(document.getElementById('page-funding')?.classList.contains('on'))setTimeout(()=>renderFundingPage(),0);
   // colgroup으로 각 컬럼 폭 고정 → sticky 찌그러짐 해결
-  const POL_W=90, GRADE_W=72, TOT_W=90;
-  const fixedW=80+72+(hasTV?62:0)+(hasIn?58:0)+72+(showPols?(activePols.length*POL_W+GRADE_W):0)+TOT_W;
+  const POL_W=90, GRADE_W=72, TOT_W=90, TOT2_W=90;
+  const fixedW=80+72+(hasTV?62:0)+(hasIn?58:0)+72+(showPols?(activePols.length*POL_W+GRADE_W):0)+TOT_W+TOT2_W;
   let cg='<colgroup>';
   cg+=`<col style="width:80px">`;
   cg+=`<col style="width:72px">`;
@@ -1092,6 +1095,7 @@ function renderTable(){
   cg+=`<col style="width:72px">`;
   if(showPols){activePols.forEach(()=>{cg+=`<col style="width:${POL_W}px">`;});cg+=`<col style="width:${GRADE_W}px">`;}
   cg+=`<col style="width:${TOT_W}px">`;
+  cg+=`<col style="width:${TOT2_W}px">`;
   cg+='</colgroup>';
   document.getElementById('tbl-wrap').innerHTML=`
   <table style="${showPols?'width:max-content;min-width:100%':'width:auto'}">
@@ -1105,7 +1109,8 @@ function renderTable(){
         <th class="th-sec" rowspan="2" style="position:sticky;left:272px;z-index:12;width:72px;min-width:72px;max-width:72px;box-shadow:3px 0 8px -2px rgba(0,0,0,.1)">상품권<div style="font-size:9px;opacity:.55;margin-top:1px;">합산제외</div></th>
         ${polThs}
         ${gradeHdr}
-        <th rowspan="2" style="background:#001A6A;color:#fff;font-size:11px;font-weight:700;width:90px;min-width:90px;">수수료<br>총합<div style="font-size:8.5px;font-weight:500;opacity:.7;margin-top:2px;line-height:1.2">상품권 제외</div></th>
+        <th rowspan="2" style="background:#E4ECFB;color:#1E3A6E;font-size:11px;font-weight:700;width:90px;min-width:90px;border-bottom:2px solid var(--bd)">수수료<br>총합<div style="font-size:8.5px;font-weight:500;opacity:.65;margin-top:2px;line-height:1.2">상품권 제외</div></th>
+        <th rowspan="2" style="background:#EFF4FC;color:#2B5797;font-size:11px;font-weight:700;width:90px;min-width:90px;border-bottom:2px solid #B7C9E8">수수료<br>총합<div style="font-size:8.5px;font-weight:500;opacity:.65;margin-top:2px;line-height:1.2">상품권 포함</div></th>
       </tr>
       <tr></tr>
     </thead>
@@ -1162,7 +1167,13 @@ function updateRowTotal(td){
     if(!pid.includes('상품권')) sub+=parseFloat(t.textContent.replace(/,/g,''))||0;
   });
   const totTd=tds.find(t=>t.classList.contains('c-tot'));
-  if(totTd) totTd.textContent=(Math.floor(sub/100)*100).toLocaleString();
+  const totVal=Math.floor(sub/100)*100;
+  if(totTd) totTd.textContent=totVal.toLocaleString();
+  // 포함 합계(c-tot-inc)도 함께 갱신
+  const giftTd=tds.find(t=>t.classList.contains('c-gift'));
+  const giftVal=giftTd?(parseFloat(giftTd.textContent.replace(/,/g,''))||0):0;
+  const totIncTd=tds.find(t=>t.classList.contains('c-tot-gift'));
+  if(totIncTd) totIncTd.textContent=(Math.floor((totVal+giftVal)/100)*100).toLocaleString();
 }
 
 // ══════ 상품권 셀 편집 (수수료 합계 미포함) ══════
@@ -1234,6 +1245,14 @@ function editGift(td, ri){
     td.classList.remove('editing');
     const fv=giftVals[ri];
     td.textContent=fv?fv.toLocaleString():'';
+    // 포함 합계(c-tot-inc) 갱신
+    const tr=td.closest('tr');
+    const totTd=tr?.querySelector('.c-tot');
+    const totIncTd=tr?.querySelector('.c-tot-gift');
+    if(totTd&&totIncTd){
+      const exVal=parseFloat(totTd.textContent.replace(/,/g,''))||0;
+      totIncTd.textContent=(Math.floor((exVal+(fv||0))/100)*100).toLocaleString();
+    }
     saveAll();
   }
   inp.addEventListener('blur',commit);
