@@ -1348,23 +1348,28 @@ function _doImg(){
       else if(pSec.includes('TV 단독')||pSec.includes('2ndTV')) rg=gradeTvU;
     }
     // 상품권 정책은 total 제외
-    const total=Math.floor((activePols.filter(p=>!p.name.includes('상품권')).reduce((s,p)=>s+getVal(p.id,i),0)+rg)/100)*100;
+    const rawTot=activePols.filter(p=>!p.name.includes('상품권')).reduce((s,p)=>s+getVal(p.id,i),0)+rg;
     const gift=giftVals[i]||0;
-    rows.push({sec:pSec,cat:pCat,tv:pTv,in:row.in,total,gift,
+    // 화면(renderTable)과 동일한 100원 절삭 규칙
+    const total=Math.floor(rawTot/100)*100;          // 상품권 제외 합계
+    const totalInc=Math.floor((rawTot+gift)/100)*100; // 상품권 포함 합계
+    rows.push({sec:pSec,cat:pCat,tv:pTv,in:row.in,total,totalInc,gift,
       isSecNew:row.sec!==null,isTvNew:row.tv!==null});
   });
   const N=rows.length;
   function mksp(fn){const o=new Array(N).fill(0);for(let i=0;i<N;i++)if(i===0||fn(rows[i])!==fn(rows[i-1])){let s=1;while(i+s<N&&fn(rows[i+s])===fn(rows[i]))s++;o[i]=s;}return o;}
   const SS=mksp(r=>r.sec), CS=mksp(r=>r.sec+'|'+r.cat), TS=mksp(r=>r.sec+'|'+r.tv);
   const hasSP=Object.keys(giftVals).length>0; // 상품권 입력값 있으면 컬럼 표시
-  // 컬럼: 대분류 | 구분 | TV | 인터넷 | [상품권] | 수수료합계
+  // 컬럼: 대분류 | 구분 | TV | 인터넷 | [상품권] | 수수료합계(제외) | 수수료합계(포함)
   const COLS=[];
   COLS.push({w:58, lbl:'대분류'});
   COLS.push({w:52, lbl:'구분'});
   COLS.push({w:52, lbl:'TV'});
   COLS.push({w:48, lbl:'인터넷'});
   if(hasSP) COLS.push({w:72,lbl:'상품권'});
-  COLS.push({w:94,lbl:'수수료 합계\n(상품권 제외)'});
+  COLS.push({w:90,lbl:'수수료 총합\n(상품권 제외)'});
+  COLS.push({w:90,lbl:'수수료 총합\n(상품권 포함)'});
+  const I_TOT=COLS.length-2, I_INC=COLS.length-1; // 합계 컬럼 인덱스
   const CX=[0]; COLS.forEach(c=>CX.push(CX[CX.length-1]+c.w));
   const TW=CX[COLS.length];
   const SC=2, RH=22, TOPH=30, HDRH=24, DY=TOPH+HDRH, TH=DY+N*RH+1;
@@ -1379,16 +1384,26 @@ function _doImg(){
     hdrColor:'#4B5563',     // thead 글씨
     thSecBg:'#F3F4F6',      // 구조 컬럼 헤더
     thSecColor:'#111827',
-    totHdrBg:'#1E3A6E',     // 합계 헤더
-    spHdrBg:'#1D5799',      // 상품권 헤더
+    // ── 파스텔톤 합계 (화면 .c-tot / .c-tot-gift 와 동일) ──
+    totHdrBg:'#E4ECFB',     // 합계(제외) 헤더 배경
+    totHdrColor:'#1E3A6E',
+    incHdrBg:'#EFF4FC',     // 합계(포함) 헤더 배경
+    incHdrColor:'#2B5797',
+    spHdrBg:'#F5F8FF',      // 상품권 헤더 (c-gift 톤)
+    spHdrColor:'#1D5799',
     hdrWhite:'#ffffff',
     catBg:'#EEF2F8',        // 대분류/구분 셀 배경
     catColor:'#2B5797',     // 대분류 텍스트
     tvColor:'#374151',
     inColor:'#111827',
-    totBg:'#1E3A6E',        // 합계 셀 배경
-    totColor:'#ffffff',
+    totBg:'#E4ECFB',        // 합계(제외) 셀 배경
+    totColor:'#1E3A6E',
+    incBg:'#EFF4FC',        // 합계(포함) 셀 배경
+    incColor:'#2B5797',
+    spBg:'#F5F8FF',         // 상품권 셀 배경
     spColor:'#1D5799',
+    totBd:'#3B7DD8',        // var(--bd) — 합계(제외) 좌측 보더
+    incBd:'#E4E7EC',        // var(--br) — 합계(포함) 좌측 보더
     rowBg1:'#ffffff',
     rowBg2:'#F9FAFB',
     secDiv:'#C5D2E8',       // 섹션 구분선
@@ -1421,21 +1436,23 @@ function _doImg(){
   fr(tw1,0,TW-tw1,TOPH,'#EEF2F8'); tx(curMonth||'',tw1,0,TW-tw1,TOPH,'c','#2B5797',12,true);
   ln(0,TOPH,TW,TOPH,UI.border,1);
 
-  // 헤더 행 - UI thead와 동일
+  // 헤더 행 - UI thead와 동일 (파스텔톤)
   COLS.forEach((col,ci)=>{
-    const isTotal=ci===COLS.length-1;
-    const isGift=hasSP&&ci===COLS.length-2;
-    const bg=isTotal?UI.totHdrBg:isGift?UI.spHdrBg:UI.thSecBg;
-    const co=isTotal||isGift?UI.hdrWhite:UI.thSecColor;
+    const isGift=hasSP&&ci===I_TOT-1;
+    const bg=ci===I_TOT?UI.totHdrBg:ci===I_INC?UI.incHdrBg:isGift?UI.spHdrBg:UI.thSecBg;
+    const co=ci===I_TOT?UI.totHdrColor:ci===I_INC?UI.incHdrColor:isGift?UI.spHdrColor:UI.thSecColor;
     fr(CX[ci],TOPH,col.w,HDRH,bg);
     tx(col.lbl,CX[ci],TOPH,col.w,HDRH,'c',co,9.5,true);
   });
-  ln(0,DY,TW,DY,UI.totHdrBg,1.5);
+  ln(0,DY,TW,DY,UI.totBd,1.5);
 
   // PASS A: 행 배경
   rows.forEach((_,i)=>{
     const y=DY+i*RH, bg=i%2===0?UI.rowBg1:UI.rowBg2;
-    COLS.forEach((col,ci)=>fr(CX[ci],y,col.w,RH,ci===COLS.length-1?UI.totBg:bg));
+    COLS.forEach((col,ci)=>{
+      const cbg=ci===I_TOT?UI.totBg:ci===I_INC?UI.incBg:(hasSP&&ci===I_TOT-1)?UI.spBg:bg;
+      fr(CX[ci],y,col.w,RH,cbg);
+    });
   });
   // PASS B: 대분류·구분 rowspan 배경
   rows.forEach((r,i)=>{
@@ -1449,9 +1466,9 @@ function _doImg(){
     if(CS[i]>0&&r.cat) tx(r.cat,CX[1],y,COLS[1].w,CS[i]*RH,'c','#374151',9,false);
     if(TS[i]>0&&r.tv) tx(r.tv,CX[2],y,COLS[2].w,TS[i]*RH,'c',UI.tvColor,9.5,false);
     tx(r.in||'',CX[3],y,COLS[3].w,RH,'c',UI.inColor,9.5,false);
-    if(hasSP&&r.gift>0) tx(r.gift.toLocaleString(),CX[4],y,COLS[4].w,RH,'r',UI.spColor,9.5,true);
-    const tc=COLS.length-1;
-    if(r.total>0) tx(r.total.toLocaleString(),CX[tc],y,COLS[tc].w,RH,'r',UI.totColor,11,true);
+    if(hasSP&&r.gift>0) tx(r.gift.toLocaleString(),CX[I_TOT-1],y,COLS[I_TOT-1].w,RH,'r',UI.spColor,9.5,true);
+    if(r.total>0)    tx(r.total.toLocaleString(),   CX[I_TOT],y,COLS[I_TOT].w,RH,'r',UI.totColor,11,true);
+    if(r.totalInc>0) tx(r.totalInc.toLocaleString(),CX[I_INC],y,COLS[I_INC].w,RH,'r',UI.incColor,10.5,true);
     // 구분선 — rowspan 중인 컬럼 위에는 선 안 그림
     if(i>0){
       if(r.isSecNew){
@@ -1473,7 +1490,12 @@ function _doImg(){
   ln(0,DY+N*RH,TW,DY+N*RH,UI.secDiv,1);
 
   // 세로선
-  COLS.slice(0,-1).forEach((_,ci)=>ln(CX[ci+1],TOPH,CX[ci+1],TH,UI.border,0.5));
+  COLS.slice(0,-1).forEach((_,ci)=>{
+    const bx=ci+1; // CX[bx] = 컬럼 bx의 왼쪽 경계
+    if(bx===I_TOT)      ln(CX[bx],TOPH,CX[bx],TH,UI.totBd,2);   // 화면 .c-tot border-left 2px var(--bd)
+    else if(bx===I_INC) ln(CX[bx],TOPH,CX[bx],TH,UI.incBd,1);   // 화면 .c-tot-gift border-left 1px var(--br)
+    else                ln(CX[bx],TOPH,CX[bx],TH,UI.border,0.5);
+  });
 
   // 외곽선
   ctx.strokeStyle=UI.border; ctx.lineWidth=1.5;
