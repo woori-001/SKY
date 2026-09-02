@@ -168,6 +168,7 @@ thead th.th-pol:hover .rm-pol{display:block;}
 .fs:focus{border-color:var(--bd);}
 
 #save-status{font-size:11px;color:var(--gn);font-weight:500;}
+#app-ver{font-size:10px;color:#94A3B8;font-weight:600;letter-spacing:.2px}
 #sync-dot{font-size:9px;color:#CBD5E1;margin:0 2px;transition:color .3s;cursor:pointer}
 #sync-dot:hover{opacity:.7}
 #sync-dot.syncing{color:#3B82F6;animation:syncPulse 1s ease-in-out infinite}
@@ -332,9 +333,11 @@ thead th.th-pol:hover .rm-pol{display:block;}
     <div class="tb-title" id="tb-title">수수료표</div>
     <div class="tb-r">
       <span id="save-status"></span>
+      <span id="app-ver" title="파일 버전">v15.3</span>
       <span id="sync-dot" title="클라우드 자동 동기화" onclick="gsAutoSync('now')">●</span>
       <button class="btn btn-o sm" onclick="gsSave()" title="구글 시트에 저장">☁ 저장</button>
       <button class="btn btn-o sm" onclick="gsLoad().then(ok=>{if(ok){renderTable();renderGrade();}})" title="구글 시트에서 불러오기 (평소엔 자동으로 동기화됩니다)">☁ 불러오기</button>
+      <button class="btn btn-o sm" onclick="gsDiagnose()" title="클라우드 연결 진단">🔍 진단</button>
       <button class="btn btn-o sm" onclick="saveImg()">↓ 이미지</button>
       <button class="btn btn-o sm" onclick="window.print()">인쇄</button>
     </div>
@@ -658,6 +661,230 @@ async function saveCompareImage(){
 }
 function showGsStatus(msg,ok=true){const el=document.getElementById('save-status');if(!el)return;el.textContent=msg;el.style.opacity='1';el.style.color=ok?'':'#EF4444';clearTimeout(window._saveStatusTimer);window._saveStatusTimer=setTimeout(()=>{el.style.opacity='0';el.style.color='';},3000);}
 function gsSaveDebounced(){clearTimeout(_gsSaveTimer);_gsSaveTimer=setTimeout(gsSave,1500);}
+
+/* ══════ v15: 클라우드 업로드 용량 관리 ══════
+   구글시트는 셀 1칸에 50,000자까지만 저장된다. 넘으면 조용히 잘려서
+   시트에 깨진 JSON이 남고, 이후 '불러오기'가 전부 실패한다.
+   → ① 기본값과 같은 데이터는 아예 안 올리고(무손실)
+     ② 그래도 크면 오래된 월부터 덜어낸다.                        */
+const GS_MAX_CHARS=45000;   // 50,000에서 여유분 확보
+
+function _eq(a,b){try{return JSON.stringify(a)===JSON.stringify(b);}catch(e){return false;}}
+
+// 상품표: 기본값과 똑같은 월은 올리지 않는다 (불러올 때 기본값으로 복원되므로 무손실)
+function gsCollectFeeRows(){
+  const fr={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i); if(!k)continue;
+    if(!/^sky_(rows|def)_\d{4}-\d{2}$/.test(k))continue;
+    try{
+      const v=JSON.parse(localStorage.getItem(k));
+      if(k.startsWith('sky_rows_')&&_eq(v,BASE_ROWS))continue;
+      if(k.startsWith('sky_def_') &&_eq(v,BASE_DEF ))continue;
+      fr[k]=v;
+    }catch(e){}
+  }
+  return fr;
+}
+
+// 월별 정책: 기본 목록과 같거나 값이 비어 있으면 올리지 않는다
+function gsCollectMonthPolicies(){
+  const mp={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i); if(!k)continue;
+    if(!/^sky_(pols3|pv3|gift3)_\d{4}-\d{2}$/.test(k))continue;
+    try{
+      let v=JSON.parse(localStorage.getItem(k));
+      if(k.startsWith('sky_pols3_')){
+        if(_eq(v,BASE_POLICIES))continue;          // 기본 목록 = 생략
+      }else if(k.startsWith('sky_pv3_')){
+        v=_prunePolVals(v);
+        if(!v||!Object.keys(v).length)continue;    // 입력값 없음 = 생략
+      }else{
+        v=_pruneGift(v);
+        if(!v||!Object.keys(v).length)continue;
+      }
+      mp[k]=v;
+    }catch(e){}
+  }
+  return mp;
+}
+
+// 0/빈값은 빼고 저장 (null은 '명시적 0'이라 의미가 있으므로 유지)
+function _prunePolVals(pv){
+  if(!pv||typeof pv!=='object')return {};
+  const out={};
+  Object.keys(pv).forEach(pid=>{
+    const row=pv[pid]; if(!row||typeof row!=='object')return;
+    const o={};
+    Object.keys(row).forEach(ri=>{
+      const v=row[ri];
+      if(v===null){o[ri]=null;return;}            // 명시적 0 → 보존
+      if(v===undefined||v===''||+v===0)return;    // 빈값/0 → 생략
+      o[ri]=v;
+    });
+    if(Object.keys(o).length)out[pid]=o;
+  });
+  return out;
+}
+function _pruneGift(g){
+  if(!g||typeof g!=='object')return {};
+  const out={};
+  Object.keys(g).forEach(k=>{const v=g[k];if(v!==undefined&&v!==''&&+v!==0)out[k]=v;});
+  return out;
+}
+
+// 한도에 맞을 때까지 오래된 월부터 제거
+function gsFitPayload(data){
+  const dropped=[];
+  let text=JSON.stringify(data);
+  if(text.length<=GS_MAX_CHARS)return {text,dropped};
+
+  const months=()=>{
+    const s=new Set();
+    Object.keys(data.feeRows||{}).forEach(k=>s.add(k.slice(k.lastIndexOf('_')+1)));
+    Object.keys(data.monthPolicies||{}).forEach(k=>s.add(k.slice(k.lastIndexOf('_')+1)));
+    return [...s].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();   // 오래된 순
+  };
+  const keep=(typeof curMonthKey==='function')?curMonthKey():'';
+  let list=months();
+  while(text.length>GS_MAX_CHARS&&list.length>1){
+    const old=list.find(m=>m!==keep);
+    if(!old)break;
+    ['sky_rows_','sky_def_'].forEach(p=>{delete data.feeRows[p+old];});
+    ['sky_pols3_','sky_pv3_','sky_gift3_'].forEach(p=>{delete data.monthPolicies[p+old];});
+    dropped.push(old);
+    list=months();
+    text=JSON.stringify(data);
+  }
+  return {text,dropped};
+}
+
+/* ══════ v15: 클라우드 연결 진단 ══════ */
+function gsDiagnose(){
+  const L=[];
+  const add=(k,v)=>L.push([k,v]);
+  add('브라우저 온라인', navigator.onLine?'예':'아니오 (인터넷 끊김)');
+  add('앱스스크립트 URL', GS_URL.slice(0,60)+'…');
+
+  // 업로드 예정 용량 계산
+  let sz='—', drop='—';
+  try{
+    const probe={v:3,savedAt:new Date().toISOString(),
+      policies,polVals,giftVals,
+      state:{gradeU,gradeInU,gradeTvU,selIN,selTV,curMonth},
+      fund:{partners:PARTNERS,fees:partnerFees},
+      monthHistory:(typeof monthHistory!=='undefined'?monthHistory:{}),
+      marketPrices:(typeof marketPrices!=='undefined'?marketPrices:[]),
+      cmpMarket:(typeof marketPriceData!=='undefined'?marketPriceData:{}),
+      infraBlocks,feeRows:gsCollectFeeRows(),monthPolicies:gsCollectMonthPolicies()};
+    const raw=JSON.stringify(probe).length;
+    const fit=gsFitPayload(probe);
+    sz=raw.toLocaleString()+'자 → 업로드 '+fit.text.length.toLocaleString()+'자 (한도 '+GS_MAX_CHARS.toLocaleString()+')';
+    drop=fit.dropped.length?fit.dropped.join(', '):'없음';
+  }catch(e){sz='계산 실패: '+e.message;}
+  add('업로드 용량', sz);
+  add('용량 초과로 제외되는 월', drop);
+  const lastSz=localStorage.getItem('sky_lastPayloadSize');
+  add('직전 업로드 용량', lastSz?(+lastSz).toLocaleString()+'자':'기록 없음');
+
+  const mset=new Set();
+  Object.keys(localStorage).forEach(k=>{const m=/^sky_pols3_(\d{4}-\d{2})$/.exec(k);if(m)mset.add(m[1]);});
+  add('이 PC에 저장된 월', [...mset].sort().join(', ')||'없음');
+  add('마지막 동기화 상태', _gsSyncState.code+' — '+_gsSyncState.msg);
+
+  const box=document.createElement('div');
+  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const esc=s=>String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+  box.innerHTML='<div style="background:#fff;border-radius:10px;max-width:620px;width:100%;max-height:80vh;overflow:auto;padding:20px 22px;font-size:12px;line-height:1.7">'
+    +'<div style="font-size:15px;font-weight:700;margin-bottom:12px">🔍 클라우드 연결 진단</div>'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +L.map(([k,v])=>'<tr><td style="padding:5px 8px;color:#666;white-space:nowrap;vertical-align:top;border-bottom:1px solid #F1F3F6">'+esc(k)+'</td>'
+      +'<td style="padding:5px 8px;font-weight:600;word-break:break-all;border-bottom:1px solid #F1F3F6">'+esc(v)+'</td></tr>').join('')
+    +'</table>'
+    +'<div id="diag-live" style="margin-top:14px;padding:10px 12px;background:#F8FAFC;border-radius:7px">연결 테스트 중...</div>'
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">'
+    +'<button id="diag-open" style="padding:7px 14px;border:1px solid #CBD5E1;background:#fff;border-radius:6px;cursor:pointer">시트 응답 직접 열기</button>'
+    +'<button id="diag-close" style="padding:7px 14px;border:none;background:#1E3A6E;color:#fff;border-radius:6px;cursor:pointer">닫기</button>'
+    +'</div></div>';
+  document.body.appendChild(box);
+  box.querySelector('#diag-close').onclick=()=>box.remove();
+  box.querySelector('#diag-open').onclick=()=>window.open(GS_URL,'_blank');
+  box.onclick=e=>{if(e.target===box)box.remove();};
+
+  // 실제 JSONP 왕복 테스트
+  const live=box.querySelector('#diag-live');
+  const t0=Date.now(), cb='_gsDiag'+t0;
+  const sc=document.createElement('script'); let done=false;
+  window[cb]=function(d){
+    done=true;
+    const ms=Date.now()-t0;
+    if(!d||!d.v){
+      live.innerHTML='<b style="color:#DC2626">⚠ 응답은 왔지만 데이터 형식이 아닙니다</b><br>'
+        +'시트에 저장된 내용이 깨졌을 수 있습니다. ☁ 저장을 한 번 눌러 새로 덮어써 보세요. ('+ms+'ms)';
+    }else{
+      const mp=d.monthPolicies?Object.keys(d.monthPolicies).filter(k=>k.startsWith('sky_pols3_')).map(k=>k.slice(10)).sort():[];
+      live.innerHTML='<b style="color:#15803D">✓ 연결 정상 ('+ms+'ms)</b><br>'
+        +'시트 저장 시각: '+(d.savedAt?new Date(d.savedAt).toLocaleString('ko-KR'):'—')+'<br>'
+        +'시트에 있는 월: '+(mp.join(', ')||'(월별 데이터 없음 — 구버전 형식)');
+    }
+    try{document.head.removeChild(sc);}catch(_){}
+    delete window[cb];
+  };
+  sc.onerror=()=>{if(!done){
+    live.innerHTML='<b style="color:#DC2626">⚠ 시트에서 응답을 받지 못했습니다</b><br>'
+      +'가능한 원인: ① 앱스스크립트 배포가 만료됐거나 URL이 바뀜 ② 배포 권한이 "모든 사용자"가 아님 ③ 인터넷/방화벽 차단.<br>'
+      +'아래 <b>시트 응답 직접 열기</b>를 눌러 무엇이 나오는지 확인해 보세요.';
+  }try{document.head.removeChild(sc);}catch(_){}delete window[cb];};
+  sc.src=GS_URL+'?callback='+cb+'&t='+t0;
+  document.head.appendChild(sc);
+  setTimeout(()=>{if(!done){
+    live.innerHTML='<b style="color:#DC2626">⚠ 8초 안에 응답이 없습니다 (시간 초과)</b><br>'
+      +'저장된 데이터가 너무 커서 시트가 응답하지 못하는 경우일 수 있습니다. ☁ 저장을 눌러 용량을 줄인 뒤 다시 시도해 보세요.';
+    try{document.head.removeChild(sc);}catch(_){}delete window[cb];
+  }},8000);
+}
+
+// 저장이 실제로 시트에 반영됐는지 되읽어 확인
+function gsVerifySave(savedAt,dropped){
+  setTimeout(()=>{
+    const cb='_gsVfy'+Date.now();
+    const sc=document.createElement('script');
+    let done=false;
+    window[cb]=function(d){
+      done=true;
+      const okTime=d&&d.savedAt&&Math.abs(Date.parse(d.savedAt)-Date.parse(savedAt))<120000;
+      if(d&&d.v&&okTime){
+        _gsSet('ok','저장 확인됨 · '+new Date().toLocaleTimeString('ko-KR')
+          +(dropped&&dropped.length?'\n(용량 한도로 오래된 월 제외: '+dropped.join(', ')+')':''));
+        setSyncDot('ok',_gsSyncState.msg);
+        showGsStatus(dropped&&dropped.length
+          ? '✓ 저장됨 (오래된 '+dropped.length+'개월 제외)'
+          : '✓ 구글시트 저장 확인됨');
+        try{localStorage.setItem('sky_lastSyncAt',String(Date.now()));}catch(_){}
+      }else{
+        _gsSet('savefail','시트에 저장 요청은 갔지만 되읽기 확인에 실패했습니다. 앱스스크립트 배포 상태를 확인하세요.');
+        setSyncDot('off',_gsSyncState.msg);
+        showGsStatus('⚠ 저장 확인 실패 — 진단을 실행해보세요',false);
+      }
+      try{document.head.removeChild(sc);}catch(_){}
+      delete window[cb];
+    };
+    sc.onerror=()=>{if(!done){
+      _gsSet('savefail','저장 후 확인 요청이 실패했습니다(구글시트 응답 없음).');
+      setSyncDot('off',_gsSyncState.msg);
+      showGsStatus('⚠ 저장 확인 실패 (응답 없음)',false);
+    }try{document.head.removeChild(sc);}catch(_){}delete window[cb];};
+    sc.src=GS_URL+'?callback='+cb+'&t='+Date.now();
+    document.head.appendChild(sc);
+    setTimeout(()=>{if(!done){
+      _gsSet('savefail','저장 후 확인 요청이 시간 초과됐습니다.');
+      setSyncDot('off',_gsSyncState.msg);
+      showGsStatus('⚠ 저장 확인 시간 초과',false);
+      try{document.head.removeChild(sc);}catch(_){}delete window[cb];
+    }},8000);
+  },2500);
+}
 function gsSave(){
   // 즉시 피드백
   const btn=document.querySelector('button[onclick="gsSave()"]');
@@ -688,39 +915,33 @@ function gsSave(){
       fund:{partners:PARTNERS||[],fees:partnerFees||[]},
       monthHistory:(typeof monthHistory!=='undefined'?monthHistory:{}),
       marketPrices:_mp,cmpMarket:(typeof marketPriceData!=='undefined'?marketPriceData:{}),diffRangeStart:_drs,diffRangeEnd:_dre,infraBlocks:_ib,
-      feeRows:(()=>{
-        const fr={};
-        for(let i=0;i<localStorage.length;i++){
-          const k=localStorage.key(i);
-          if(k&&(k.startsWith('sky_rows_')||k.startsWith('sky_def_'))){
-            try{fr[k]=JSON.parse(localStorage.getItem(k));}catch(e){}
-          }
-        }
-        return fr;
-      })(),
-      // v15 추가: 월별 수수료 정책값 전체 (7월/8월/9월… 각각 따로 보존)
-      monthPolicies:(()=>{
-        const mp={};
-        for(let i=0;i<localStorage.length;i++){
-          const k=localStorage.key(i);
-          if(!k)continue;
-          if(/^sky_(pols3|pv3|gift3)_\d{4}-\d{2}$/.test(k)){
-            try{mp[k]=JSON.parse(localStorage.getItem(k));}catch(e){}
-          }
-        }
-        return mp;
-      })()};
-    // localStorage 즉시 백업
+      feeRows:gsCollectFeeRows(),
+      monthPolicies:gsCollectMonthPolicies()};
+
+    // v15: 구글시트 셀 1칸 한도(50,000자)를 넘지 않도록 오래된 월부터 덜어낸다.
+    //  → 넘긴 채로 저장하면 시트에 잘린 JSON이 들어가 이후 '불러오기'가 통째로 실패함
+    const _fit=gsFitPayload(data);
+    let payload=_fit.text;
+
+    // localStorage 즉시 백업 (백업은 자르지 않은 원본)
     try{localStorage.setItem('sky_backup',JSON.stringify(data));}catch(_){}
     // form submit으로 구글시트 저장
     const form=document.getElementById('gsHiddenForm');
     const inp=document.getElementById('gsHiddenData');
     if(form&&inp){
-      inp.value=JSON.stringify(data);
+      inp.value=payload;
       form.action=GS_URL;
       form.submit();
-      try{localStorage.setItem('sky_cloudPushedAt',String(Date.now()));}catch(_){}
-      showGsStatus('✓ 구글시트 저장됨');
+      try{
+        localStorage.setItem('sky_cloudPushedAt',String(Date.now()));
+        localStorage.setItem('sky_lastPayloadSize',String(payload.length));
+      }catch(_){}
+      showGsStatus('☁ 저장 요청 보냄 ('+Math.round(payload.length/1024)+'KB) — 확인 중...');
+      if(_fit.dropped.length){
+        console.warn('[gsSave] 용량 초과로 클라우드에서 제외된 월:',_fit.dropped);
+      }
+      // 실제로 시트에 들어갔는지 되읽어서 확인 (예전엔 확인 없이 '저장됨'이라고 표시했음)
+      gsVerifySave(data.savedAt,_fit.dropped);
     } else {
       showGsStatus('✓ 로컬 저장됨 (form 재생성 중)');
     }
@@ -1885,7 +2106,8 @@ const SYNC_DOT={
   paused:'idle',     // 회색: 편집 중이라 잠시 멈춤
   nodata:'idle',     // 회색: 클라우드에 아직 데이터 없음 (오류 아님)
   offline:'off',     // 빨강: 연결 실패
-  timeout:'off'      // 빨강: 응답 없음
+  timeout:'off',     // 빨강: 응답 없음
+  savefail:'off'     // 빨강: 저장 확인 실패
 };
 
 let _gsSyncing=false, _gsRetryTimer=null;
