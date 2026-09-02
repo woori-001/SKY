@@ -168,9 +168,12 @@ thead th.th-pol:hover .rm-pol{display:block;}
 .fs:focus{border-color:var(--bd);}
 
 #save-status{font-size:11px;color:var(--gn);font-weight:500;}
-#sync-dot{font-size:9px;color:#CBD5E1;margin:0 2px;transition:color .3s;cursor:default}
-#sync-dot.syncing{color:#F59E0B;animation:syncPulse 1s ease-in-out infinite}
+#sync-dot{font-size:9px;color:#CBD5E1;margin:0 2px;transition:color .3s;cursor:pointer}
+#sync-dot:hover{opacity:.7}
+#sync-dot.syncing{color:#3B82F6;animation:syncPulse 1s ease-in-out infinite}
 #sync-dot.ok{color:#16A34A}
+#sync-dot.idle{color:#CBD5E1}
+#sync-dot.warn{color:#F59E0B}
 #sync-dot.off{color:#EF4444}
 @keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* ── 목표달성/펀딩 공통 ── */
@@ -329,7 +332,7 @@ thead th.th-pol:hover .rm-pol{display:block;}
     <div class="tb-title" id="tb-title">수수료표</div>
     <div class="tb-r">
       <span id="save-status"></span>
-      <span id="sync-dot" title="클라우드 자동 동기화">●</span>
+      <span id="sync-dot" title="클라우드 자동 동기화" onclick="gsAutoSync('now')">●</span>
       <button class="btn btn-o sm" onclick="gsSave()" title="구글 시트에 저장">☁ 저장</button>
       <button class="btn btn-o sm" onclick="gsLoad().then(ok=>{if(ok){renderTable();renderGrade();}})" title="구글 시트에서 불러오기 (평소엔 자동으로 동기화됩니다)">☁ 불러오기</button>
       <button class="btn btn-o sm" onclick="saveImg()">↓ 이미지</button>
@@ -728,6 +731,10 @@ function gsSave(){
     if(btn){btn.textContent='☁ 저장';btn.disabled=false;}
   }
 }
+// v15: 마지막 동기화 결과 (점 색깔/툴팁의 근거)
+let _gsSyncState={code:'idle',msg:'아직 동기화하지 않음'};
+function _gsSet(code,msg){_gsSyncState={code,msg};}
+
 function gsLoad(opt){
   const AUTO=!!(opt&&opt.auto);   // v15: 자동 동기화 모드 (조용히, 안전장치 적용)
   return new Promise((resolve)=>{
@@ -743,6 +750,7 @@ function gsLoad(opt){
         // ── 자동 모드 안전장치 ──────────────────────────────
         // ① 편집 중이면 화면을 건드리지 않는다
         if(AUTO&&typeof _editGroups!=='undefined'&&_editGroups){
+          _gsSet('paused','상품 편집 중이라 동기화를 잠시 멈췄습니다. 편집을 마치면 다시 동기화됩니다.');
           showGsStatus('☁ 편집 중 — 동기화 보류'); resolve(false);
           try{document.head.removeChild(script);}catch(_){}
           delete window[cbName]; return;
@@ -752,7 +760,8 @@ function gsLoad(opt){
           const localAt=+(localStorage.getItem('sky_localEditAt')||0);
           const cloudAt=Date.parse(data.savedAt||0)||0;
           if(localAt&&cloudAt&&localAt>cloudAt+3000){
-            showGsStatus('⚠ 로컬 변경이 더 최신 — ☁ 저장을 눌러주세요',false);
+            _gsSet('localnewer','이 PC의 수정 내용이 클라우드보다 최신이라 덮어쓰지 않았습니다. 자동으로 클라우드에 올립니다.');
+            showGsStatus('☁ 로컬 변경을 클라우드로 올리는 중...');
             resolve(false);
             try{document.head.removeChild(script);}catch(_){}
             delete window[cbName]; return;
@@ -829,6 +838,7 @@ function gsLoad(opt){
         }
 
         try{localStorage.setItem('sky_lastSyncAt',String(Date.now()));}catch(_){}
+        _gsSet('ok','마지막 동기화 '+new Date().toLocaleTimeString('ko-KR'));
         const _feeCount=data.feeRows?Object.keys(data.feeRows).filter(k=>k.startsWith('sky_rows_')).length:0;
         const _empty=(!policies||policies.length===0);
         if(AUTO){
@@ -842,14 +852,17 @@ function gsLoad(opt){
         try{renderTable();renderGrade();}catch(e){}
         try{if(document.getElementById('page-compare')?.classList.contains('on')&&typeof initCompare==='function')initCompare();}catch(e){}
         resolve(true);
-      }catch(e){showGsStatus(AUTO?'☁ 클라우드 데이터 없음':'⚠ 클라우드 없음',false);resolve(false);}
+      }catch(e){
+        _gsSet('nodata','클라우드에 저장된 데이터가 아직 없습니다. ☁ 저장을 한 번 누르면 올라갑니다. ('+(e&&e.message||'')+')');
+        showGsStatus(AUTO?'☁ 클라우드 데이터 없음':'⚠ 클라우드 없음',false);resolve(false);
+      }
       try{document.head.removeChild(script);}catch(_){}
       delete window[cbName];
     };
-    script.onerror=()=>{if(!done){showGsStatus(AUTO?'☁ 오프라인 (로컬 데이터 사용)':'⚠ 오프라인',false);resolve(false);}try{document.head.removeChild(script);}catch(_){}delete window[cbName];};
+    script.onerror=()=>{if(!done){_gsSet('offline','구글시트에 연결하지 못했습니다. 인터넷 연결 또는 앱스스크립트 배포 상태를 확인하세요. 지금은 이 PC에 저장된 데이터로 작동 중입니다.');showGsStatus(AUTO?'☁ 오프라인 (로컬 데이터 사용)':'⚠ 오프라인',false);resolve(false);}try{document.head.removeChild(script);}catch(_){}delete window[cbName];};
     script.src=GS_URL+'?callback='+cbName+'&t='+Date.now();
     document.head.appendChild(script);
-    setTimeout(()=>{if(!done){showGsStatus(AUTO?'☁ 응답 지연 (로컬 데이터 사용)':'⚠ 타임아웃',false);resolve(false);}},8000);
+    setTimeout(()=>{if(!done){_gsSet('timeout','구글시트 응답이 8초 안에 오지 않았습니다. 잠시 후 자동으로 다시 시도합니다. 지금은 이 PC에 저장된 데이터로 작동 중입니다.');showGsStatus(AUTO?'☁ 응답 지연 (로컬 데이터 사용)':'⚠ 타임아웃',false);resolve(false);}},8000);
   });
 }
 
@@ -1862,21 +1875,46 @@ window.onload=async()=>{
 function setSyncDot(state,tip){
   const d=document.getElementById('sync-dot'); if(!d)return;
   d.className=state||'';
-  d.title=tip||'클라우드 자동 동기화';
+  d.title=(tip||'클라우드 자동 동기화')+'\n(클릭하면 지금 다시 시도합니다)';
 }
-let _gsSyncing=false;
+
+// 원인별 점 색깔 — 빨강은 "정말 연결이 안 될 때"만
+const SYNC_DOT={
+  ok:'ok',           // 초록: 정상 동기화됨
+  localnewer:'warn', // 주황: 이 PC가 더 최신 → 자동으로 올림
+  paused:'idle',     // 회색: 편집 중이라 잠시 멈춤
+  nodata:'idle',     // 회색: 클라우드에 아직 데이터 없음 (오류 아님)
+  offline:'off',     // 빨강: 연결 실패
+  timeout:'off'      // 빨강: 응답 없음
+};
+
+let _gsSyncing=false, _gsRetryTimer=null;
 async function gsAutoSync(force){
   if(_gsSyncing)return false;
-  // 과도한 호출 방지 (일반 60초 / 강제 10초 이내면 생략)
-  const last=+(localStorage.getItem('sky_lastSyncAt')||0);
-  if(last&&Date.now()-last<(force?10000:60000))return false;
+  // 과도한 호출 방지 (수동 'now'는 무제한 / 강제 10초 / 일반 60초)
+  if(force!=='now'){
+    const last=+(localStorage.getItem('sky_lastSyncAt')||0);
+    if(last&&Date.now()-last<(force?10000:60000))return false;
+  }
   _gsSyncing=true;
   setSyncDot('syncing','동기화 중...');
   try{
     const ok=await gsLoad({auto:true});
-    setSyncDot(ok?'ok':'off', ok
-      ? '마지막 동기화 '+new Date().toLocaleTimeString('ko-KR')
-      : '클라우드 연결 안 됨 — 로컬 데이터 사용 중');
+    const st=_gsSyncState;
+    setSyncDot(SYNC_DOT[st.code]||'idle', st.msg);
+
+    // 이 PC가 더 최신이면 → 덮어쓰는 대신 클라우드로 올려서 해소
+    if(st.code==='localnewer'){
+      try{
+        gsSave();
+        setTimeout(()=>setSyncDot('ok','이 PC의 내용을 클라우드에 올렸습니다 · '+new Date().toLocaleTimeString('ko-KR')),1500);
+      }catch(e){}
+    }
+    // 연결 실패는 30초 뒤 한 번 자동 재시도
+    if(st.code==='offline'||st.code==='timeout'){
+      clearTimeout(_gsRetryTimer);
+      _gsRetryTimer=setTimeout(()=>gsAutoSync('now'),30000);
+    }
     return ok;
   }finally{ _gsSyncing=false; }
 }
