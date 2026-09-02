@@ -168,6 +168,11 @@ thead th.th-pol:hover .rm-pol{display:block;}
 .fs:focus{border-color:var(--bd);}
 
 #save-status{font-size:11px;color:var(--gn);font-weight:500;}
+#sync-dot{font-size:9px;color:#CBD5E1;margin:0 2px;transition:color .3s;cursor:default}
+#sync-dot.syncing{color:#F59E0B;animation:syncPulse 1s ease-in-out infinite}
+#sync-dot.ok{color:#16A34A}
+#sync-dot.off{color:#EF4444}
+@keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* ── 목표달성/펀딩 공통 ── */
 .dz{border:1.5px dashed var(--br);border-radius:8px;padding:16px 10px;text-align:center;cursor:pointer;transition:border-color .12s,background .12s;background:#FAFBFC;user-select:none;}
 .dz:hover{border-color:var(--bd);background:var(--bl);}
@@ -324,8 +329,9 @@ thead th.th-pol:hover .rm-pol{display:block;}
     <div class="tb-title" id="tb-title">수수료표</div>
     <div class="tb-r">
       <span id="save-status"></span>
+      <span id="sync-dot" title="클라우드 자동 동기화">●</span>
       <button class="btn btn-o sm" onclick="gsSave()" title="구글 시트에 저장">☁ 저장</button>
-      <button class="btn btn-o sm" onclick="gsLoad().then(ok=>{if(ok){renderTable();renderGrade();}})" title="구글 시트에서 불러오기">☁ 불러오기</button>
+      <button class="btn btn-o sm" onclick="gsLoad().then(ok=>{if(ok){renderTable();renderGrade();}})" title="구글 시트에서 불러오기 (평소엔 자동으로 동기화됩니다)">☁ 불러오기</button>
       <button class="btn btn-o sm" onclick="saveImg()">↓ 이미지</button>
       <button class="btn btn-o sm" onclick="window.print()">인쇄</button>
     </div>
@@ -710,6 +716,7 @@ function gsSave(){
       inp.value=JSON.stringify(data);
       form.action=GS_URL;
       form.submit();
+      try{localStorage.setItem('sky_cloudPushedAt',String(Date.now()));}catch(_){}
       showGsStatus('✓ 구글시트 저장됨');
     } else {
       showGsStatus('✓ 로컬 저장됨 (form 재생성 중)');
@@ -721,9 +728,10 @@ function gsSave(){
     if(btn){btn.textContent='☁ 저장';btn.disabled=false;}
   }
 }
-function gsLoad(){
+function gsLoad(opt){
+  const AUTO=!!(opt&&opt.auto);   // v15: 자동 동기화 모드 (조용히, 안전장치 적용)
   return new Promise((resolve)=>{
-    showGsStatus('☁ 불러오는 중...');
+    showGsStatus(AUTO?'☁ 동기화 중...':'☁ 불러오는 중...');
     const cbName='_gsCb'+Date.now();
     const script=document.createElement('script');
     let done=false;
@@ -731,6 +739,26 @@ function gsLoad(){
       done=true;
       try{
         if(!data||!data.v||data.v<2)throw new Error('no data');
+
+        // ── 자동 모드 안전장치 ──────────────────────────────
+        // ① 편집 중이면 화면을 건드리지 않는다
+        if(AUTO&&typeof _editGroups!=='undefined'&&_editGroups){
+          showGsStatus('☁ 편집 중 — 동기화 보류'); resolve(false);
+          try{document.head.removeChild(script);}catch(_){}
+          delete window[cbName]; return;
+        }
+        // ② 아직 클라우드에 안 올라간 로컬 변경이 더 최신이면 덮어쓰지 않는다
+        if(AUTO){
+          const localAt=+(localStorage.getItem('sky_localEditAt')||0);
+          const cloudAt=Date.parse(data.savedAt||0)||0;
+          if(localAt&&cloudAt&&localAt>cloudAt+3000){
+            showGsStatus('⚠ 로컬 변경이 더 최신 — ☁ 저장을 눌러주세요',false);
+            resolve(false);
+            try{document.head.removeChild(script);}catch(_){}
+            delete window[cbName]; return;
+          }
+        }
+        // ───────────────────────────────────────────────────
         // v15: 지금 화면에서 선택된 월을 기준으로 삼는다 (클라우드의 curMonth로 덮어쓰지 않음)
         const _mi=document.getElementById('month-in');
         let selMonth=(_mi&&_mi.value)||curMonthKey()||'';
@@ -772,6 +800,19 @@ function gsLoad(){
           }catch(e){}
         }
 
+        // v15: 첫 접속(월을 직접 고른 적 없음)이고 현재 월에 데이터가 없으면,
+        //      클라우드에 데이터가 있는 최근 월로 자동 이동
+        if(AUTO&&!localStorage.getItem('sky_lastMonth')){
+          const has=m=>!!localStorage.getItem('sky_pols3_'+m);
+          if(selMonth&&!has(selMonth)){
+            const cand=Object.keys(localStorage)
+              .filter(k=>/^sky_pols3_\d{4}-\d{2}$/.test(k))
+              .map(k=>k.slice('sky_pols3_'.length)).sort();
+            const pick=(savedMonth&&has(savedMonth))?savedMonth:(cand.length?cand[cand.length-1]:'');
+            if(pick){selMonth=pick;try{localStorage.setItem('sky_lastMonth',pick);}catch(_){}}
+          }
+        }
+
         // 선택된 월의 데이터만 화면에 올린다
         if(selMonth){
           const[y,mm]=selMonth.split('-');
@@ -780,28 +821,35 @@ function gsLoad(){
           _editGroups=null;
           loadMonthRows(selMonth);
           await loadMonthPolicies(selMonth);
+          const _amm=document.getElementById('analysis-month-mirror'); if(_amm)_amm.value=selMonth;
         }else{
           policies=data.policies||[];
           polVals=data.polVals||{};
           giftVals=data.giftVals||{};
         }
 
+        try{localStorage.setItem('sky_lastSyncAt',String(Date.now()));}catch(_){}
         const _feeCount=data.feeRows?Object.keys(data.feeRows).filter(k=>k.startsWith('sky_rows_')).length:0;
         const _empty=(!policies||policies.length===0);
-        showGsStatus(_empty
-          ? '✓ 불러옴 · '+(curMonth||'')+' 저장된 정책 없음'
-          : '✓ 구글시트 불러옴'+(_feeCount>0?' (수수료표 '+_feeCount+'개월)':'')+(_mpCount>0?' · 정책 '+_mpCount+'개월':''),
-          !_empty);
+        if(AUTO){
+          showGsStatus(_empty?('☁ 동기화됨 · '+(curMonth||'')+' 정책 없음'):'☁ 동기화됨 · '+(curMonth||''), !_empty);
+        }else{
+          showGsStatus(_empty
+            ? '✓ 불러옴 · '+(curMonth||'')+' 저장된 정책 없음'
+            : '✓ 구글시트 불러옴'+(_feeCount>0?' (수수료표 '+_feeCount+'개월)':'')+(_mpCount>0?' · 정책 '+_mpCount+'개월':''),
+            !_empty);
+        }
         try{renderTable();renderGrade();}catch(e){}
+        try{if(document.getElementById('page-compare')?.classList.contains('on')&&typeof initCompare==='function')initCompare();}catch(e){}
         resolve(true);
-      }catch(e){showGsStatus('⚠ 클라우드 없음',false);resolve(false);}
+      }catch(e){showGsStatus(AUTO?'☁ 클라우드 데이터 없음':'⚠ 클라우드 없음',false);resolve(false);}
       try{document.head.removeChild(script);}catch(_){}
       delete window[cbName];
     };
-    script.onerror=()=>{if(!done){showGsStatus('⚠ 오프라인',false);resolve(false);}try{document.head.removeChild(script);}catch(_){}delete window[cbName];};
+    script.onerror=()=>{if(!done){showGsStatus(AUTO?'☁ 오프라인 (로컬 데이터 사용)':'⚠ 오프라인',false);resolve(false);}try{document.head.removeChild(script);}catch(_){}delete window[cbName];};
     script.src=GS_URL+'?callback='+cbName+'&t='+Date.now();
     document.head.appendChild(script);
-    setTimeout(()=>{if(!done){showGsStatus('⚠ 타임아웃',false);resolve(false);}},8000);
+    setTimeout(()=>{if(!done){showGsStatus(AUTO?'☁ 응답 지연 (로컬 데이터 사용)':'⚠ 타임아웃',false);resolve(false);}},8000);
   });
 }
 
@@ -1045,6 +1093,7 @@ async function saveAll(){
       stg('sky_pv3_last',   polVals),
       stg('sky_gift3_last', giftVals),
     ]);
+    try{localStorage.setItem('sky_localEditAt',String(Date.now()));}catch(_){}
     showSaved(); gsSaveDebounced();
   }catch(e){console.warn('saveAll error:',e);}
 }
@@ -1713,6 +1762,8 @@ async function setMonth(){
   loadMonthRows(newV);  // 새 월 상품표 로드
   await loadMonthPolicies(newV);
   renderTable(); renderGrade();
+  // v15: 이 월의 로컬 저장본이 없으면 클라우드에 있는지 한 번 확인
+  if(!localStorage.getItem('sky_pols3_'+newV)) gsAutoSync(true);
   try{localStorage.setItem('sky_lastMonth',newV);}catch(e){}
   // v15: 선택한 월을 상태에도 기록 → 새로고침 시 그 월로 복귀
   await stg('sky_state3',{gradeU,gradeInU,gradeTvU,selIN,selTV,curMonth});
@@ -1795,12 +1846,46 @@ window.onload=async()=>{
         await saveMonthPolicies(miv);
       }
     }
-    try{localStorage.setItem('sky_lastMonth',miv);}catch(e){}
+    // 주의: 여기서 sky_lastMonth를 쓰지 않는다.
+    // (사용자가 직접 고른 월만 기록 → 첫 접속 시 클라우드의 최근 월로 이동 가능)
   }
 
   renderTable();
   if(typeof renderInfraBlocks==='function') renderInfraBlocks();
+
+  // ══════ v15: 접속 시 클라우드 자동 동기화 ══════
+  // 로컬(localStorage)로 화면을 먼저 그린 뒤, 구글시트에서 월별 전체 데이터를
+  // 받아와 "지금 선택된 월"만 다시 그린다. 실패해도 로컬 데이터로 계속 사용 가능.
+  gsAutoSync();
 };
+
+function setSyncDot(state,tip){
+  const d=document.getElementById('sync-dot'); if(!d)return;
+  d.className=state||'';
+  d.title=tip||'클라우드 자동 동기화';
+}
+let _gsSyncing=false;
+async function gsAutoSync(force){
+  if(_gsSyncing)return false;
+  // 과도한 호출 방지 (일반 60초 / 강제 10초 이내면 생략)
+  const last=+(localStorage.getItem('sky_lastSyncAt')||0);
+  if(last&&Date.now()-last<(force?10000:60000))return false;
+  _gsSyncing=true;
+  setSyncDot('syncing','동기화 중...');
+  try{
+    const ok=await gsLoad({auto:true});
+    setSyncDot(ok?'ok':'off', ok
+      ? '마지막 동기화 '+new Date().toLocaleTimeString('ko-KR')
+      : '클라우드 연결 안 됨 — 로컬 데이터 사용 중');
+    return ok;
+  }finally{ _gsSyncing=false; }
+}
+
+// 탭으로 돌아왔을 때 다시 동기화 (다른 PC에서 수정한 내용 반영)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') gsAutoSync();
+});
+window.addEventListener('online',()=>gsAutoSync(true));
 
 
 // ════ 협력점 / 펀딩 데이터 ════
@@ -1837,11 +1922,17 @@ function parseWorkbook(buf){
   // XLSX 라이브러리 있으면 사용 (xlsx, xls 모두 지원)
   if(typeof XLSX!=='undefined'){
     try{
-      const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+      // v15: cellDates로 "진짜 날짜 셀"만 Date 객체로 받는다.
+      //  (기존엔 40000~60000 사이 '숫자'를 무조건 날짜로 바꿔서
+      //   45,000원·58,000원 같은 정산금액이 날짜 문자열로 망가졌음)
+      const wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
-      const xlDateToStr=n=>{if(typeof n!=='number'||n<40000||n>60000)return n;const d=new Date(Math.round((n-25569)*86400*1000));return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;};
-      return rows.map(r=>r.map(xlDateToStr));
+      const dToStr=v=>{
+        if(!(v instanceof Date)||isNaN(v))return v;
+        return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+      };
+      return rows.map(r=>r.map(dToStr));
     }catch(e){}
   }
   // CSV 폴백 (UTF-8, EUC-KR 순서로 시도)
@@ -1961,8 +2052,8 @@ function handleFile(event,type){
         if(!wb||wb.length<2){if(el)el.innerHTML+='⚠ 데이터 없음';return;}
       }
       const hdr=wb[0].map(v=>String(v||'').trim());
-      // rcParseRows 방식으로 헤더 기반 객체 변환 (실적계산과 동일)
-      const dataRows=typeof rcParseRows==='function'?rcParseRows(wb):[];
+      // v15: 이 화면은 관대한 파서 사용 (실적계산의 엄격한 규칙과 분리)
+      const dataRows=typeof rcParseRowsLoose==='function'?rcParseRowsLoose(wb):[];
       let mth=getAnalysisMonth();
       // 파일 내 날짜 자동 감지
       {const freq={};dataRows.forEach(r=>{const d=String(r['개통일']||r['처리일']||'');const mm=d.match(/^(\d{4}-\d{2})/);if(mm)freq[mm[1]]=(freq[mm[1]]||0)+1;});
@@ -2035,7 +2126,7 @@ function handleFile(event,type){
           if(!monthHistory[mth2])monthHistory[mth2]={};
           const settleByPart2={};let settleTotalOut2=0;
           const settleCol=hdr.indexOf('정산금액');
-          if(settleCol>=0){for(let ri2=1;ri2<wb.length;ri2++){const r2=wb[ri2];if(!r2||r2.every(v=>!v))continue;const pRaw2=partCol>=0?String(r2[partCol]||''):'';const pNm2=(()=>{let s=(pRaw2||'').replace(/[★☆○●◎◆◇■□▲▽△▼()[\]*+\-./\\]/g,' ').replace(/^\d+\.\s*/,'').replace(/\s+/g,'');for(const p of PARTNERS){if(s.includes(p))return p;}return pRaw2||'기타';})();const amt2=+r2[settleCol]||0;if(amt2){settleByPart2[pNm2]=(settleByPart2[pNm2]||0)+amt2;settleTotalOut2+=amt2;}}}
+          if(settleCol>=0){for(let ri2=1;ri2<wb.length;ri2++){const r2=wb[ri2];if(!r2||r2.every(v=>!v))continue;const pRaw2=partCol>=0?String(r2[partCol]||''):'';const pNm2=(()=>{let s=(pRaw2||'').replace(/[★☆○●◎◆◇■□▲▽△▼()[\]*+\-./\\]/g,' ').replace(/^\d+\.\s*/,'').replace(/\s+/g,'');for(const p of PARTNERS){if(s.includes(p))return p;}return pRaw2||'기타';})();const amt2=rcNum(r2[settleCol]);if(amt2){settleByPart2[pNm2]=(settleByPart2[pNm2]||0)+amt2;settleTotalOut2+=amt2;}}}
           saveMonthData(mth2,'wire',{openIN,openTV,applyIN,applyTV,ocnt:{...ocnt},acnt:{...acnt},settleTotalOut:settleTotalOut2,settleByPart:settleByPart2});
         }
       }catch(mhErr){console.warn('wire저장오류',mhErr);}
@@ -2991,6 +3082,26 @@ function rcParseRows(raw){
     const no=r['No']||'';
     return no!==''&&!no.includes('화면')&&no!=='No';
   });
+}
+
+/* 목표달성·파일업로드 분석용 관대한 파서.
+   정산 파일이 아닌 다양한 양식도 받으므로 'No' 필수 조건 없이 읽는다.
+   (실적계산은 위의 rcParseRows — v7과 동일한 엄격한 규칙 — 을 사용) */
+function rcParseRowsLoose(raw){
+  let headerIdx=0;
+  for(let i=0;i<Math.min(10,raw.length);i++){
+    const row=(raw[i]||[]).map(v=>String(v||''));
+    if(row.indexOf('상품명')>=0&&row.indexOf('상부점')>=0){headerIdx=i;break;}
+    if(row.indexOf('상품명')>=0&&row.indexOf('협력점')>=0){headerIdx=i;break;}
+  }
+  const h0=(raw[headerIdx]||[]).map(v=>String(v||''));
+  const h1=(raw[headerIdx+1]||[]).map(v=>String(v||''));
+  const headers=h0.map((v,i)=>v||h1[i]||'');
+  return raw.slice(headerIdx+1).map(row=>{
+    const obj={};
+    headers.forEach((h,i)=>{obj[h]=row[i]!==undefined?row[i]:'';});
+    return obj;
+  }).filter(r=>r['상품명']||r['상부점']);
 }
 
 function rcGetRows(key){
