@@ -655,6 +655,16 @@ function gsSave(){
   if(btn){btn.textContent='저장 중...';btn.disabled=true;}
   showGsStatus('☁ 저장 중...');
   try{
+    // v15: 현재 화면의 월 데이터를 먼저 월별 키(localStorage)에 확정 반영해두고 업로드
+    try{
+      const _cm=(typeof curMonthKey==='function')?curMonthKey():'';
+      if(_cm){
+        localStorage.setItem('sky_pols3_'+_cm,JSON.stringify(policies||[]));
+        localStorage.setItem('sky_pv3_'+_cm,  JSON.stringify(polVals||{}));
+        localStorage.setItem('sky_gift3_'+_cm,JSON.stringify(giftVals||{}));
+        if(typeof saveMonthRows==='function')saveMonthRows(_cm);
+      }
+    }catch(_){}
     // 안전하게 변수 읽기
     const _drs=(typeof diffRangeStart!=='undefined')?diffRangeStart:700;
     const _dre=(typeof diffRangeEnd!=='undefined')?diffRangeEnd:1000;
@@ -678,6 +688,18 @@ function gsSave(){
           }
         }
         return fr;
+      })(),
+      // v15 추가: 월별 수수료 정책값 전체 (7월/8월/9월… 각각 따로 보존)
+      monthPolicies:(()=>{
+        const mp={};
+        for(let i=0;i<localStorage.length;i++){
+          const k=localStorage.key(i);
+          if(!k)continue;
+          if(/^sky_(pols3|pv3|gift3)_\d{4}-\d{2}$/.test(k)){
+            try{mp[k]=JSON.parse(localStorage.getItem(k));}catch(e){}
+          }
+        }
+        return mp;
       })()};
     // localStorage 즉시 백업
     try{localStorage.setItem('sky_backup',JSON.stringify(data));}catch(_){}
@@ -705,14 +727,20 @@ function gsLoad(){
     const cbName='_gsCb'+Date.now();
     const script=document.createElement('script');
     let done=false;
-    window[cbName]=function(data){
+    window[cbName]=async function(data){
       done=true;
       try{
         if(!data||!data.v||data.v<2)throw new Error('no data');
-        if(data.policies)policies=data.policies;
-        if(data.polVals)polVals=data.polVals;
-        if(data.giftVals)giftVals=data.giftVals;
-        if(data.state){const st=data.state;gradeU=st.gradeU||0;gradeInU=st.gradeInU||0;gradeTvU=st.gradeTvU||0;selIN=st.selIN||null;selTV=st.selTV||null;if(st.curMonth)curMonth=st.curMonth;}
+        // v15: 지금 화면에서 선택된 월을 기준으로 삼는다 (클라우드의 curMonth로 덮어쓰지 않음)
+        const _mi=document.getElementById('month-in');
+        let selMonth=(_mi&&_mi.value)||curMonthKey()||'';
+        const savedMonth=(()=>{
+          const m=String((data.state&&data.state.curMonth)||'').match(/(\d{4})년\s*(\d+)월/);
+          return m?m[1]+'-'+String(m[2]).padStart(2,'0'):'';
+        })();
+        if(!selMonth) selMonth=savedMonth;
+
+        if(data.state){const st=data.state;gradeU=st.gradeU||0;gradeInU=st.gradeInU||0;gradeTvU=st.gradeTvU||0;selIN=st.selIN||null;selTV=st.selTV||null;}
         if(data.fund){if(data.fund.partners)PARTNERS=[...data.fund.partners];if(data.fund.fees)partnerFees=data.fund.fees;}
         if(data.monthHistory){monthHistory=data.monthHistory;saveMonthHistory();}
         if(data.marketPrices)marketPrices=data.marketPrices;
@@ -723,10 +751,47 @@ function gsLoad(){
             try{localStorage.setItem(k,JSON.stringify(data.feeRows[k]));}catch(e){}
           });
         }
+        // v15: 월별 수수료 정책값 복원
+        let _mpCount=0;
+        if(data.monthPolicies&&typeof data.monthPolicies==='object'){
+          Object.keys(data.monthPolicies).forEach(k=>{
+            if(!/^sky_(pols3|pv3|gift3)_\d{4}-\d{2}$/.test(k))return;
+            try{localStorage.setItem(k,JSON.stringify(data.monthPolicies[k]));}catch(e){}
+          });
+          _mpCount=Object.keys(data.monthPolicies).filter(k=>k.startsWith('sky_pols3_')).length;
+        }
+        // 구버전 백업(월 구분 없이 저장된 데이터)은 저장 당시의 월에만 이관
+        if(_mpCount===0&&savedMonth){
+          try{
+            if(!localStorage.getItem('sky_pols3_'+savedMonth)){
+              localStorage.setItem('sky_pols3_'+savedMonth,JSON.stringify(data.policies||[]));
+              localStorage.setItem('sky_pv3_'+savedMonth,  JSON.stringify(data.polVals||{}));
+              localStorage.setItem('sky_gift3_'+savedMonth,JSON.stringify(data.giftVals||{}));
+              _mpCount=1;
+            }
+          }catch(e){}
+        }
+
+        // 선택된 월의 데이터만 화면에 올린다
+        if(selMonth){
+          const[y,mm]=selMonth.split('-');
+          curMonth=y+'년 '+parseInt(mm)+'월';
+          if(_mi)_mi.value=selMonth;
+          _editGroups=null;
+          loadMonthRows(selMonth);
+          await loadMonthPolicies(selMonth);
+        }else{
+          policies=data.policies||[];
+          polVals=data.polVals||{};
+          giftVals=data.giftVals||{};
+        }
+
         const _feeCount=data.feeRows?Object.keys(data.feeRows).filter(k=>k.startsWith('sky_rows_')).length:0;
-        showGsStatus('✓ 구글시트 불러옴'+(_feeCount>0?' (수수료표 '+_feeCount+'개월)':''));
-        // 상품표/수수료표 재렌더링
-        loadMonthRows(curMonthKey());
+        const _empty=(!policies||policies.length===0);
+        showGsStatus(_empty
+          ? '✓ 불러옴 · '+(curMonth||'')+' 저장된 정책 없음'
+          : '✓ 구글시트 불러옴'+(_feeCount>0?' (수수료표 '+_feeCount+'개월)':'')+(_mpCount>0?' · 정책 '+_mpCount+'개월':''),
+          !_empty);
         try{renderTable();renderGrade();}catch(e){}
         resolve(true);
       }catch(e){showGsStatus('⚠ 클라우드 없음',false);resolve(false);}
@@ -860,7 +925,8 @@ const BASE_DEF={
 
 
 // ══════ 상태 ══════
-let policies=[
+// v15: 저장 기록이 없는 월의 초기 정책 목록 (원본 보존용)
+const BASE_POLICIES=[
   {id:'Mass-01',  num:'Mass-01',       name:'기본지급정책',      apply:true},
   {id:'Mass-03',  num:'Mass-03',       name:'목표달성률',         apply:true},
   {id:'Mass-11',  num:'Mass-11',       name:'전략신규점 육성',    apply:true},
@@ -877,7 +943,8 @@ let policies=[
   {id:'사업TV04', num:'사업-TV-04',    name:'Mass결합정책',       apply:true},
   {id:'사업TV0403',num:'사업-TV-04-03',name:'Mass결합(고가)',      apply:true},
   {id:'사업TV32', num:'사업-TV-기타',  name:'권역차등',           apply:true},
-]
+];
+let policies=JSON.parse(JSON.stringify(BASE_POLICIES));
 let polVals={};   // {polId: {rowIdx: value|null}}  null=명시적 0 (DEF 복원 방지)
 let infraBlocks=[];
 let selIN=null, selTV=null, gradeU=0, gradeInU=0, gradeTvU=0, curMonth='';
@@ -932,13 +999,15 @@ function importData(event){
       if(data.state){
         const st=data.state;
         gradeU=st.gradeU||0;gradeInU=st.gradeInU||0;gradeTvU=st.gradeTvU||0;
-        selIN=st.selIN||null;selTV=st.selTV||null;curMonth=st.curMonth||'';
+        selIN=st.selIN||null;selTV=st.selTV||null;
+        // v15: curMonth는 덮어쓰지 않는다. 지금 화면에서 선택한 월로 가져온다.
       }
       if(data.fund){
         if(data.fund.partners&&Array.isArray(data.fund.partners))PARTNERS=[...data.fund.partners];
         if(data.fund.fees&&Array.isArray(data.fund.fees))partnerFees=data.fund.fees;
       }
       await saveAll();
+      await saveMonthPolicies(curMonthKey());   // v15: 선택된 월에 확정 저장
       renderTable();
       renderGrade();
       if(gradeU>0){
@@ -968,9 +1037,13 @@ async function saveAll(){
     await Promise.all([
       stg(pk('sky_pols3'), policies),
       stg(pk('sky_pv3'),   polVals),
+      stg(pk('sky_gift3'), giftVals),   // v15: 상품권도 월별로 저장 (기존엔 월 구분 없이 덮어써짐)
       stg('sky_ib3',       infraBlocks),
       stg('sky_state3',{gradeU, gradeInU, gradeTvU, selIN, selTV, curMonth}),
-      stg('sky_gift3', giftVals),
+      // 아래 3개는 "마지막으로 보던 월"의 미러 (구버전 호환용)
+      stg('sky_pols3_last', policies),
+      stg('sky_pv3_last',   polVals),
+      stg('sky_gift3_last', giftVals),
     ]);
     showSaved(); gsSaveDebounced();
   }catch(e){console.warn('saveAll error:',e);}
@@ -1616,10 +1689,15 @@ async function saveMonthPolicies(v){
 async function loadMonthPolicies(v){
   if(!v)return;
   const[p,pv,gf]=await Promise.all([ldg('sky_pols3_'+v),ldg('sky_pv3_'+v),ldg('sky_gift3_'+v)]);
-  // 없으면 빈 상태로 시작 (다른 월 데이터 상속 안 함)
-  policies=p||[];
-  polVals=pv||{};
-  giftVals=gf||{};
+  if(Array.isArray(p)){
+    // 저장 기록이 있으면 그대로 (빈 배열이면 빈 상태 유지 = 사용자가 지운 것)
+    policies=p; polVals=pv||{}; giftVals=gf||{};
+  }else{
+    // v15: 저장 기록이 아예 없는 월 → 기본 정책 목록으로 시작 (값은 비움).
+    //      다른 월의 입력값을 상속하지는 않는다.
+    policies=JSON.parse(JSON.stringify(BASE_POLICIES));
+    polVals={}; giftVals={};
+  }
 }
 async function setMonth(){
   const newV=document.getElementById('month-in').value; if(!newV)return;
@@ -1636,6 +1714,8 @@ async function setMonth(){
   await loadMonthPolicies(newV);
   renderTable(); renderGrade();
   try{localStorage.setItem('sky_lastMonth',newV);}catch(e){}
+  // v15: 선택한 월을 상태에도 기록 → 새로고침 시 그 월로 복귀
+  await stg('sky_state3',{gradeU,gradeInU,gradeTvU,selIN,selTV,curMonth});
 }
 const PL={table:'수수료표',grade:'그레이드 단가',compare:'비교',result:'실적계산'};
 function go(pg){
@@ -1660,13 +1740,8 @@ function moOut(e){if(e.target===document.getElementById('modal'))moClose();}
 window.onload=async()=>{
   loadFundingData();
   // 저장된 데이터 복원
-  const[p,v,ib,st,gf]=await Promise.all([
-    ldg('sky_pols3'), ldg('sky_pv3'), ldg('sky_ib3'), ldg('sky_state3'), ldg('sky_gift3')
-  ]);
-  if(p) policies=p;
-  if(v) polVals=v;
+  const[ib,st]=await Promise.all([ ldg('sky_ib3'), ldg('sky_state3') ]);
   if(ib) infraBlocks=ib;
-  if(gf) giftVals=gf;
 
   // 그레이드·월 상태 복원
   if(st){
@@ -1689,14 +1764,39 @@ window.onload=async()=>{
 
   // 월 입력 복원 (저장된 월 없으면 현재 월)
   const n=new Date();
-  const savedMonthInput=curMonth
+  // v15: 마지막으로 보던 월(sky_lastMonth)을 우선 사용
+  let savedMonthInput=null;
+  try{
+    const lm=localStorage.getItem('sky_lastMonth');
+    if(lm&&/^\d{4}-\d{2}$/.test(lm)) savedMonthInput=lm;
+  }catch(e){}
+  if(!savedMonthInput) savedMonthInput=curMonth
     ? (()=>{
         const m=curMonth.match(/(\d+)년\s*(\d+)월/);
         return m?m[1]+'-'+String(m[2]).padStart(2,'0'):null;
       })()
     : null;
   const miv=savedMonthInput||(n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'));document.getElementById('month-in').value=miv;const amm=document.getElementById('analysis-month-mirror');if(amm)amm.value=miv;
-  if(!curMonth) setMonth();
+
+  // v15: 항상 "선택된 월"의 데이터를 로드한다.
+  //  (v14는 curMonth가 복원되면 setMonth()를 건너뛰어 월 구분 없는 옛 키를
+  //   그대로 화면에 올렸음 → 7월을 골라도 8월 값이 보이던 원인)
+  {
+    const[yy,mmm]=miv.split('-');
+    curMonth=yy+'년 '+parseInt(mmm)+'월';
+    _editGroups=null;
+    loadMonthRows(miv);
+    await loadMonthPolicies(miv);
+    // 월별 저장본이 아예 없으면(구버전에서 넘어온 첫 실행) 옛 전역 키에서 1회 이관
+    if((!policies||policies.length===0)&&!localStorage.getItem('sky_pols3_'+miv)){
+      const[op,ov,og]=await Promise.all([ldg('sky_pols3'),ldg('sky_pv3'),ldg('sky_gift3')]);
+      if(op&&op.length){
+        policies=op; polVals=ov||{}; giftVals=og||{};
+        await saveMonthPolicies(miv);
+      }
+    }
+    try{localStorage.setItem('sky_lastMonth',miv);}catch(e){}
+  }
 
   renderTable();
   if(typeof renderInfraBlocks==='function') renderInfraBlocks();
@@ -2845,24 +2945,52 @@ let rcLastResult = null;
 function rcNum(v){ return typeof v==='number'?v:(parseFloat(String(v||'').replace(/,/g,''))||0); }
 function rcFmt(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
 function rcFmtM(n){ return Math.round(n/10000).toLocaleString('ko-KR')+'만원'; }
-function rcIsHaeji(s){ return /해지|철회|취소/.test(String(s||'')); }
+// v15: 코드실적계산기 v7과 동일 규칙 ('해지'만 제외. 철회/취소는 제외하지 않음)
+function rcIsHaeji(s){ return String(s||'').includes('해지'); }
 function rcVc(v){ return v<0?'#DC2626':'#15803D'; }
 
+/* ── v15 수정: 코드실적계산기 v7의 parseRows()와 100% 동일하게 맞춤 ──
+   v14까지의 차이(= 결과값이 달랐던 원인)
+   1) 중복 컬럼명 미처리 → 뒤쪽 '약정금액'(차감내역)이 앞쪽을 덮어씀
+   2) 데이터 시작이 headerIdx+1 → 서브헤더 행이 데이터로 섞임
+   3) 행 필터가 'No' 기준이 아니어서 소계/합계/화면 행이 포함됨
+   4) 셀 값을 String().trim() 하지 않아 비교가 어긋남                */
 function rcParseRows(raw){
-  let headerIdx=0;
+  // 헤더 행 탐색 (상품명+상부점 우선, 없으면 상품명+협력점)
+  let headerIdx=-1;
   for(let i=0;i<Math.min(10,raw.length);i++){
-    const row=raw[i].map(v=>String(v||''));
+    const row=(raw[i]||[]).map(v=>String(v||''));
     if(row.indexOf('상품명')>=0&&row.indexOf('상부점')>=0){headerIdx=i;break;}
-    if(row.indexOf('상품명')>=0&&row.indexOf('협력점')>=0){headerIdx=i;break;}
   }
-  const h0=raw[headerIdx].map(v=>String(v||''));
+  if(headerIdx<0){
+    for(let i=0;i<Math.min(10,raw.length);i++){
+      const row=(raw[i]||[]).map(v=>String(v||''));
+      if(row.indexOf('상품명')>=0&&row.indexOf('협력점')>=0){headerIdx=i;break;}
+    }
+  }
+  if(headerIdx<0) headerIdx=0;
+
+  const h0=(raw[headerIdx]||[]).map(v=>String(v||''));
   const h1=(raw[headerIdx+1]||[]).map(v=>String(v||''));
-  const headers=h0.map((v,i)=>v||h1[i]||'');
-  return raw.slice(headerIdx+1).map(row=>{
+  // h0이 비어있고 h1에 값 있으면 h1 사용 (차감내역 서브헤더 처리)
+  const headers=h0.map((v,i)=>(v===''&&h1[i]&&h1[i]!=='')?h1[i]:v);
+  // 중복 컬럼명 처리 — 먼저 나온 컬럼이 원본 이름을 유지 (v7과 동일)
+  const seen={};
+  const finalHeaders=headers.map(h=>{
+    if(seen[h]!==undefined){seen[h]++;return h+'_'+seen[h];}
+    seen[h]=0;return h;
+  });
+
+  return raw.slice(headerIdx+2).map(row=>{
     const obj={};
-    headers.forEach((h,i)=>{obj[h]=row[i]!==undefined?row[i]:'';});
+    finalHeaders.forEach((h,i)=>{
+      obj[h]=(row[i]!==undefined&&row[i]!==null)?String(row[i]).trim():'';
+    });
     return obj;
-  }).filter(r=>r['상품명']||r['상부점']);
+  }).filter(r=>{
+    const no=r['No']||'';
+    return no!==''&&!no.includes('화면')&&no!=='No';
+  });
 }
 
 function rcGetRows(key){
@@ -2871,9 +2999,12 @@ function rcGetRows(key){
   if(f.type==='html')return rcParseRows(f.rows);
   if(typeof XLSX!=='undefined'&&f.wb){
     const ws=f.wb.Sheets[f.wb.SheetNames[0]];
-    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
-    const xlDate=n=>{if(typeof n!=='number'||n<40000||n>60000)return n;const d=new Date(Math.round((n-25569)*86400*1000));return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;};
-    return rcParseRows(raw.map(r=>r.map(xlDate)));
+    // v15: raw:true + 엑셀 날짜 변환 제거.
+    //  → 40000~60000 구간의 '금액'(예: 45,000원 / 55,000원)이 날짜 문자열로
+    //    바뀌어 정산금액/약정금액이 통째로 망가지던 치명적 버그. v7과 동일하게
+    //    포맷된 문자열(raw 기본값 false)로 읽고 rcNum()에서 콤마만 제거한다.
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    return rcParseRows(raw);
   }
   return [];
 }
