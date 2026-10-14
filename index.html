@@ -331,6 +331,9 @@ window.SKY_CONFIG = {
     <div class="nav" id="nav-compare" onclick="go('compare')">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><path d="M2 8h5M9 8h5M8 3v10M3 5h4M9 5h4"/></svg>비교
     </div>
+    <div class="nav" id="nav-vendor" onclick="go('vendor')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><path d="M2 3h12M2 7h12M2 11h12M5 1v14M10 1v14"/></svg>상부 단가표
+    </div>
     <div class="nav" id="nav-report" onclick="go('report')">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16"><rect x="2" y="1.5" width="12" height="13" rx="2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>회의자료
     </div>
@@ -461,6 +464,17 @@ window.SKY_CONFIG = {
         </div>
       </div>
     </div><!-- /page-compare -->
+
+    <!-- ── 상부 단가표 ── -->
+    <div class="page" id="page-vendor">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:13px;padding:11px 14px;background:var(--bl);border-radius:8px">
+        <span style="font-size:12.5px;font-weight:700;color:var(--bd)">상부 단가표</span>
+        <span style="font-size:11px;color:var(--t2)"><b id="vs-month">—</b> 기준</span>
+        <input id="vs-note" placeholder="적용일시·출처 메모" oninput="vsNote(this.value)"
+          style="margin-left:auto;min-width:230px;flex:1;max-width:420px;padding:5px 9px;border:1px solid #D7DCE3;border-radius:6px;font-size:11.5px">
+      </div>
+      <div id="vs-body"></div>
+    </div><!-- /page-vendor -->
 
     <!-- ── 회의자료 ── -->
     <div class="page" id="page-report">
@@ -928,12 +942,15 @@ async function sbRefreshAll(){
     applyMatrixForMonth(ym);
     await loadMonthInto(ym);
     await sbLoadCompare(ym);
+    await sbLoadVendorSheet(ym);
     sbOnline=true;
     setSyncDot(canEdit()?'ok':'readonly',
       canEdit()?('마지막 불러옴 '+new Date().toLocaleTimeString('ko-KR'))
                :'읽기 전용 — 수정하려면 로그인하세요');
     renderTable(); renderGrade();
     if(document.getElementById('page-compare')?.classList.contains('on')) renderCompare();
+    if(document.getElementById('page-vendor')?.classList.contains('on')) initVendorSheet();
+    if(document.getElementById('page-report')?.classList.contains('on')) initReport();
     return true;
   }catch(e){
     sbOnline=false;
@@ -1860,14 +1877,16 @@ async function setMonth(){
   applyMatrixForMonth(newV);     // 그 달에 유효한 그레이드 표로 교체
   await loadMonthInto(newV);     // 그 달 정책/상품표 불러오기
   await sbLoadCompare(newV);     // 그 달 비교 수수료 불러오기
+  await sbLoadVendorSheet(newV); // 그 달 상부 단가표 불러오기
 
   renderTable(); renderGrade();
   if(document.getElementById('page-compare')?.classList.contains('on')) renderCompare();
+  if(document.getElementById('page-vendor')?.classList.contains('on')) initVendorSheet();
   if(document.getElementById('page-report')?.classList.contains('on')) initReport();
   try{localStorage.setItem('sky_lastMonth',newV);}catch(e){}
   showGsStatus(curMonth+' 정책을 불러왔습니다');
 }
-const PL={table:'수수료표',grade:'그레이드 단가',compare:'비교',report:'회의자료'};
+const PL={table:'수수료표',grade:'그레이드 단가',compare:'비교',vendor:'상부 단가표',report:'회의자료'};
 function go(pg){
   // v16: 없는 페이지를 요청하면 빈 화면이 되던 문제 → 수수료표로 되돌린다
   if(!document.getElementById('page-'+pg)) pg='table';
@@ -1882,6 +1901,7 @@ function go(pg){
   if(pg==='table') renderTable();
   if(pg==='grade'){renderGrade();renderDiffTable(selIN||0,selTV||0);}
   if(pg==='compare') initCompare();
+  if(pg==='vendor') initVendorSheet();
   if(pg==='report'){ initCompare(); initReport(); }
 }
 
@@ -1908,6 +1928,7 @@ window.onload=async()=>{
     applyMatrixForMonth(miv);
     await loadMonthInto(miv);
     await sbLoadCompare(miv);
+    await sbLoadVendorSheet(miv);
     sbOnline=true;
     setSyncDot(canEdit()?'ok':'readonly',
       canEdit()?'수정하면 자동 저장됩니다':'읽기 전용 — 수정하려면 로그인하세요');
@@ -2673,18 +2694,6 @@ function rpMarket(){
 }
 
 /* ④ 상부별 단가비교 */
-function rpSources(){
-  try{ if(!window._cmpData||!window._cmpData.length) renderCompare(); }catch(e){}
-  const names=window._cmpSrcNames||[];
-  const d=window._cmpData||[];
-  const rows=[];
-  d.forEach(g=>g.rows.forEach(r=>{
-    const ex=(r.extras||[]).filter(e=>e.val);
-    if(!ex.length) return;
-    rows.push({group:g.label, tv:r.tv, in:r.in, our:r.ourFee, extras:r.extras||[]});
-  }));
-  return {names, rows};
-}
 
 /* ── 화면 그리기 ────────────────────────────────────────── */
 function renderReport(){
@@ -2792,28 +2801,40 @@ function renderReport(){
       </tr>`).join('')}</tbody></table></div>`;
   }
 
-  // ④ 상부별 단가비교
-  const sc=rpSources();
+  // ④ 상부별 단가비교 — 상부 단가표를 원본으로 사용
+  const vs=vsForReport();
   let s4;
-  if(!sc.rows.length) s4=empty('비교 화면에서 상부를 추가하고 금액을 넣으면 여기에 나옵니다');
-  else s4=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:${480+sc.names.length*110}px">
-    <thead><tr>
-      <th style="${TH};text-align:left">구분</th><th style="${TH};text-align:left">TV</th>
-      <th style="${TH};text-align:center">인터넷</th>
-      <th style="${TH};text-align:right;border-right:1px solid var(--br)">우리</th>
-      ${sc.names.map(n=>`<th style="${TH};text-align:right">${n}</th>`).join('')}
-    </tr></thead><tbody>
-    ${sc.rows.map(r=>`<tr>
-      <td style="${TD};text-align:left;font-size:10.5px;color:var(--t2)">${r.group}</td>
-      <td style="${TD};text-align:left">${r.tv}</td>
-      <td style="${TD};text-align:center">${r.in}</td>
-      <td style="${TD};text-align:right;font-weight:700;border-right:1px solid var(--br)">${r.our.toLocaleString()}</td>
-      ${r.extras.map(e=>{
-        const d=e.val? r.our-e.val : null;
-        return `<td style="${TD};text-align:right">${e.val? e.val.toLocaleString():'<span style="color:var(--t3)">—</span>'}
-          ${d!=null?`<div style="font-size:9.5px;color:${d>0?'#1D4ED8':d<0?'#DC2626':'var(--t3)'}">${d>0?'+':''}${d.toLocaleString()}</div>`:''}</td>`;
-      }).join('')}
-    </tr>`).join('')}</tbody></table></div>`;
+  if(!vs) s4=empty('상부 단가표 화면에서 이 달 단가를 넣으면 여기에 나옵니다');
+  else{
+    const sumCards=vs.summary.map(x=>`
+      <div style="flex:1;min-width:132px;background:#F8FAFC;border:1px solid var(--br);border-radius:8px;padding:9px 12px">
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:2px">${x.name} 대비</div>
+        <div style="font-size:14.5px;font-weight:700;${FN};color:${x.avg>=0?'#15803D':'#DC2626'}">${x.avg>0?'+':''}${x.avg.toLocaleString()}원</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">우리가 높은 구간 ${x.win}/${x.n}</div>
+      </div>`).join('');
+    let body='';
+    [...new Set(vs.rows.map(r=>r.cat))].forEach(cat=>{
+      const rs=vs.rows.filter(r=>r.cat===cat);
+      body+=`<div style="font-size:11px;font-weight:700;color:var(--bd);margin:12px 0 5px">${cat}</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:${300+vs.others.length*105}px">
+        <thead><tr>
+          <th style="${TH};text-align:left">구분</th><th style="${TH};text-align:left">상품</th>
+          <th style="${TH};text-align:right;border-right:1px solid var(--br)">${vs.our||'우리'}</th>
+          ${vs.others.map(n=>`<th style="${TH};text-align:right">${n}</th>`).join('')}
+        </tr></thead><tbody>
+        ${rs.map(r=>`<tr>
+          <td style="${TD};text-align:left;font-size:10.5px;color:var(--t2)">${r.grp||''}</td>
+          <td style="${TD};text-align:left;font-weight:600">${r.product||'—'}</td>
+          <td style="${TD};text-align:right;font-weight:700;border-right:1px solid var(--br)">${r.our!=null?r.our.toLocaleString():'—'}</td>
+          ${r.vals.map(v=>{
+            const d=(r.our!=null&&v.val)? r.our-v.val : null;
+            return `<td style="${TD};text-align:right">${v.val?v.val.toLocaleString():'<span style="color:var(--t3)">—</span>'}
+              ${d!=null?`<div style="font-size:9.5px;color:${d>0?'#15803D':d<0?'#DC2626':'var(--t3)'}">${d>0?'+':''}${d.toLocaleString()}</div>`:''}</td>`;
+          }).join('')}
+        </tr>`).join('')}</tbody></table></div>`;
+    });
+    s4=`<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:4px">${sumCards}</div>${body}`;
+  }
 
   el.innerHTML =
     card('①','그레이드별 단가 / 단가별 차액', `TV ${st.tv.toLocaleString()}건 고정 · 인터넷 : TV = 55 : 45`, s1) +
@@ -2844,7 +2865,7 @@ function initReport(){
 
 /* ── 이미지 저장 ────────────────────────────────────────── */
 function rpSaveImage(){
-  const st=rpSteps(), ac=rpAchieve(), mk=rpMarket(), sc=rpSources();
+  const st=rpSteps(), ac=rpAchieve(), mk=rpMarket(), vs=vsForReport();
   const S=2, W=980, PAD=24;
   const secs=[];
   secs.push({t:'① 그레이드별 단가 / 단가별 차액',
@@ -2869,11 +2890,12 @@ function rpSaveImage(){
     head:['구분','TV','인터넷','우리','시장가','차액'], w:[180,120,80,110,110,110], al:['l','l','c','r','r','r'],
     rows:mk.map(r=>[r.group,r.tv,r.in,r.our.toLocaleString(),r.mkt.toLocaleString(),
                     (r.diff>0?'+':'')+r.diff.toLocaleString()])});
-  if(sc.rows.length) secs.push({t:'④ 상부별 단가비교', sub:'',
-    head:['구분','TV','인터넷','우리',...sc.names], w:[170,110,70,100,...sc.names.map(()=>110)],
-    al:['l','l','c','r',...sc.names.map(()=>'r')],
-    rows:sc.rows.map(r=>[r.group,r.tv,r.in,r.our.toLocaleString(),
-                         ...r.extras.map(e=>e.val?e.val.toLocaleString():'—')])});
+  if(vs) secs.push({t:'④ 상부별 단가비교', sub:'차액은 '+(vs.our||'우리')+' 기준',
+    head:['구분','상품',(vs.our||'우리'),...vs.others], w:[150,110,105,...vs.others.map(()=>105)],
+    al:['l','l','r',...vs.others.map(()=>'r')],
+    rows:vs.rows.map(r=>[r.grp||r.cat, r.product||'—',
+      r.our!=null?r.our.toLocaleString():'—',
+      ...r.vals.map(v=>v.val?v.val.toLocaleString():'—')])});
 
   const HDR_H=34, ROW_H=27, TITLE_H=40, GAP=18;
   let H=70;
@@ -2945,7 +2967,7 @@ function rpSaveExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리를 불러오지 못했습니다.'); return; }
   const wb=XLSX.utils.book_new();
   const mth=(curMonthKey()||'').replace('-','');
-  const st=rpSteps(), ac=rpAchieve(), mk=rpMarket(), sc=rpSources();
+  const st=rpSteps(), ac=rpAchieve(), mk=rpMarket(), vs=vsForReport();
 
   const a1=[['코드운영회의 자료 — ①  그레이드별 단가 / 단가별 차액'],
             ['기준', curMonth||'', 'TV 고정', st.tv, '배분', '인터넷 55% : TV 45%'],[],
@@ -2980,16 +3002,228 @@ function rpSaveExcel(){
   const ws3=XLSX.utils.aoa_to_sheet(a3); ws3['!cols']=[{wch:22},{wch:14},{wch:10},{wch:14},{wch:14},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws3,'③ 시장가 비교');
 
-  const a4=[['④ 상부별 단가비교'],['기준', curMonth||''],[],
-            ['구분','TV 상품','인터넷','우리 수수료',...sc.names]];
-  sc.rows.forEach(r=>a4.push([r.group,r.tv,r.in,r.our,...r.extras.map(e=>e.val||'')]));
-  if(!sc.rows.length) a4.push(['비교할 상부가 등록되지 않았습니다']);
+  const a4=[['④ 상부별 단가비교'],['기준', curMonth||'', '우리 열', (vs&&vs.our)||''],[]];
+  if(vs){
+    a4.push(['대분류','구분','상품',vs.our||'우리',...vs.others]);
+    vs.rows.forEach(r=>a4.push([r.cat,r.grp,r.product,r.our,...r.vals.map(v=>v.val)]));
+    a4.push([]); a4.push(['상부별 평균 차액 (우리 − 상부)']);
+    a4.push(['상부','평균 차액','우리가 높은 구간','비교 구간 수']);
+    vs.summary.forEach(x=>a4.push([x.name,x.avg,x.win,x.n]));
+  } else a4.push(['상부 단가표가 입력되지 않았습니다']);
   const ws4=XLSX.utils.aoa_to_sheet(a4);
-  ws4['!cols']=[{wch:22},{wch:14},{wch:10},{wch:14},...sc.names.map(()=>({wch:14}))];
+  ws4['!cols']=[{wch:20},{wch:20},{wch:12},{wch:13},...((vs&&vs.others)||[]).map(()=>({wch:13}))];
   XLSX.utils.book_append_sheet(wb,ws4,'④ 상부별 비교');
 
   XLSX.writeFile(wb,'코드운영회의_'+mth+'.xlsx');
   showGsStatus('엑셀을 저장했습니다');
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  상부 단가표 — 월별로 상부들의 단가를 나란히 비교
+//  회의자료 ④ 상부별 단가비교의 원본 데이터
+// ══════════════════════════════════════════════════════════════
+let vsSheet=null;          // {month, vendors, rows, base_vendor, our_vendor, note}
+
+async function sbLoadVendorSheet(ym){
+  vsSheet=null;
+  if(!sb||!ym) return;
+  const {data,error}=await sb.from('sky_vendor_sheets').select('*').eq('month',ym).maybeSingle();
+  if(error){ console.warn('상부 단가표 로드 실패',error); return; }
+  vsSheet=data||null;
+}
+
+let _vsTimer=null;
+function vsSaveDebounced(){
+  if(!canEdit()||!vsSheet) return;
+  clearTimeout(_vsTimer);
+  setSyncDot('saving','저장 중...');
+  _vsTimer=setTimeout(async()=>{
+    const ym=curMonthKey(); if(!sb||!ym) return;
+    const {error}=await sb.from('sky_vendor_sheets').upsert({
+      month:ym, vendors:vsSheet.vendors, rows:vsSheet.rows,
+      base_vendor:vsSheet.base_vendor||'', our_vendor:vsSheet.our_vendor||'',
+      note:vsSheet.note||'', updated_by:(sbUser&&sbUser.email)||''
+    },{onConflict:'month'});
+    if(error){ setSyncDot('error','저장 실패'); showGsStatus('⚠ 저장 실패 — '+error.message,false); }
+    else { setSyncDot('ok','마지막 저장 '+new Date().toLocaleTimeString('ko-KR')); showSaved(); }
+  },1200);
+}
+
+/* 이 달 시트가 없으면 직전 달 것을 복사해 시작 */
+async function vsStartFromPrev(){
+  if(!canEdit()){ alert('수정하려면 관리자로 로그인해야 합니다.'); return; }
+  const ym=curMonthKey(); if(!ym) return;
+  const {data}=await sb.from('sky_vendor_sheets').select('*')
+    .lt('month',ym).order('month',{ascending:false}).limit(1);
+  const src=(data&&data[0])||null;
+  if(src){
+    if(!confirm(`${src.month} 단가표를 복사해서 ${ym} 시트를 만들까요?`)) return;
+    vsSheet={month:ym, vendors:JSON.parse(JSON.stringify(src.vendors)),
+             rows:JSON.parse(JSON.stringify(src.rows)),
+             base_vendor:src.base_vendor, our_vendor:src.our_vendor, note:''};
+  }else{
+    if(!confirm('빈 단가표를 새로 만들까요?')) return;
+    vsSheet={month:ym, vendors:['우리정보'], rows:[], base_vendor:'', our_vendor:'우리정보', note:''};
+  }
+  vsSaveDebounced();
+  renderVendorSheet();
+}
+
+function vsSetCell(ri, vendor, val){
+  if(!vsSheet) return;
+  const n=parseInt(String(val).replace(/[^\d-]/g,''));
+  vsSheet.rows[ri].prices[vendor]= isNaN(n)?0:n;
+  vsSaveDebounced();
+  renderVendorSheet();
+}
+async function vsAddVendor(){
+  if(!canEdit()){ alert('수정하려면 관리자로 로그인해야 합니다.'); return; }
+  if(!vsSheet){ alert('먼저 단가표를 만들어 주세요.'); return; }
+  const name=prompt('추가할 상부 이름');
+  if(!name||!name.trim()) return;
+  const n=name.trim();
+  if(vsSheet.vendors.includes(n)){ alert('이미 있는 상부입니다.'); return; }
+  vsSheet.vendors.push(n);
+  vsSheet.rows.forEach(r=>{ r.prices[n]=0; });
+  vsSaveDebounced(); renderVendorSheet();
+}
+function vsDelVendor(name){
+  if(!canEdit()){ alert('수정하려면 관리자로 로그인해야 합니다.'); return; }
+  if(!confirm(`'${name}' 열을 지울까요? 이 달 입력값이 사라집니다.`)) return;
+  vsSheet.vendors=vsSheet.vendors.filter(v=>v!==name);
+  vsSheet.rows.forEach(r=>{ delete r.prices[name]; });
+  if(vsSheet.our_vendor===name) vsSheet.our_vendor='';
+  if(vsSheet.base_vendor===name) vsSheet.base_vendor='';
+  vsSaveDebounced(); renderVendorSheet();
+}
+function vsSetRole(kind, name){
+  if(!canEdit()) return;
+  if(kind==='our') vsSheet.our_vendor = (vsSheet.our_vendor===name?'':name);
+  else             vsSheet.base_vendor= (vsSheet.base_vendor===name?'':name);
+  vsSaveDebounced(); renderVendorSheet();
+}
+
+/* 행별 최고 상부 */
+function vsTopVendors(r, vendors, exclude){
+  let max=-Infinity, top=[];
+  vendors.forEach(v=>{
+    if(v===exclude) return;
+    const p=+r.prices[v]||0;
+    if(p>max){ max=p; top=[v]; } else if(p===max) top.push(v);
+  });
+  return {max, top};
+}
+
+function renderVendorSheet(){
+  const el=document.getElementById('vs-body'); if(!el) return;
+  const ro=!canEdit();
+  const FN='font-family:var(--num-font);font-variant-numeric:tabular-nums';
+
+  if(!vsSheet || !vsSheet.rows.length){
+    el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--t3);font-size:12px">
+      <div style="margin-bottom:12px">${curMonth||'이 달'}의 상부 단가표가 아직 없습니다.</div>
+      ${ro?'로그인하면 만들 수 있습니다.'
+          :'<button class="btn btn-p sm" onclick="vsStartFromPrev()">직전 달에서 복사해 만들기</button>'}
+    </div>`;
+    return;
+  }
+  const V=vsSheet.vendors, OUR=vsSheet.our_vendor, BASE=vsSheet.base_vendor;
+  const TH='padding:7px 9px;font-size:10.5px;color:var(--t3);background:#F8FAFC;border-bottom:1px solid var(--br);white-space:nowrap';
+  const TD='padding:5px 9px;font-size:11.5px;border-bottom:1px solid #F1F5F9;'+FN;
+
+  let h=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 11px;background:#F8FAFC;border:1px solid var(--br);border-radius:8px">
+    <span style="font-size:11px;color:var(--t3);font-weight:600">상부</span>`;
+  V.forEach(v=>{
+    const isOur=v===OUR, isBase=v===BASE;
+    h+=`<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid ${isOur?'#15803D':isBase?'#1D4ED8':'var(--br)'};border-radius:999px;padding:3px 4px 3px 10px;font-size:11px">
+      <b style="color:${isOur?'#15803D':isBase?'#1D4ED8':'var(--t1)'}">${v}</b>
+      ${isOur?'<span style="font-size:9px;color:#15803D">우리</span>':''}
+      ${isBase?'<span style="font-size:9px;color:#1D4ED8">기준</span>':''}
+      ${ro?'':`<button onclick="vsSetRole('our','${v}')" title="우리 본사정책으로 지정"
+          style="border:none;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:9px">우리</button>
+        <button onclick="vsSetRole('base','${v}')" title="비교 기준으로 지정"
+          style="border:none;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:9px">기준</button>
+        <button onclick="vsDelVendor('${v}')" title="열 삭제"
+          style="border:none;background:#FEE2E2;color:#B91C1C;border-radius:999px;width:17px;height:17px;line-height:1;cursor:pointer;font-size:12px">×</button>`}
+    </span>`;
+  });
+  if(!ro) h+=`<button class="btn btn-o sm" onclick="vsAddVendor()" style="margin-left:auto">+ 상부 추가</button>`;
+  h+=`</div>`;
+
+  // 카테고리별로 묶어서 출력
+  const cats=[...new Set(vsSheet.rows.map(r=>r.cat))];
+  cats.forEach(cat=>{
+    const rows=vsSheet.rows.map((r,i)=>({r,i})).filter(x=>x.r.cat===cat);
+    h+=`<div style="background:#fff;border:1px solid var(--br);border-radius:10px;overflow:hidden;margin-bottom:12px">
+      <div style="padding:9px 15px;background:#F8FAFC;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px">
+        <span style="font-size:11.5px;font-weight:700;color:var(--bd)">${cat}</span>
+        <span style="font-size:10px;color:var(--t3)">${rows.length}개</span>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:${300+V.length*115}px">
+      <thead><tr>
+        <th style="${TH};text-align:left">구분</th>
+        <th style="${TH};text-align:left">상품</th>
+        ${V.map(v=>`<th style="${TH};text-align:right;${v===OUR?'background:#F0FDF4;color:#15803D':v===BASE?'background:#EFF6FF;color:#1D4ED8':''}">${v}</th>`).join('')}
+        <th style="${TH};text-align:left">최고 상부</th>
+      </tr></thead><tbody>`;
+    let lastGrp=null;
+    rows.forEach(({r,i})=>{
+      const {max,top}=vsTopVendors(r,V,OUR);
+      const grpCell = r.grp!==lastGrp ? r.grp : '';
+      lastGrp=r.grp;
+      h+=`<tr>
+        <td style="${TD};text-align:left;font-size:11px;color:var(--t2)">${grpCell||''}</td>
+        <td style="${TD};text-align:left;font-weight:600">${r.product||'—'}</td>
+        ${V.map(v=>{
+          const p=+r.prices[v]||0;
+          const isTop = v!==OUR && top.includes(v) && max>0;
+          const bg = v===OUR?'background:#F0FDF4':v===BASE?'background:#EFF6FF':'';
+          const gap = (OUR&&v!==OUR&&p)? (+r.prices[OUR]||0)-p : null;
+          return `<td style="${TD};text-align:right;${bg}">
+            ${ro? `<span style="font-weight:${isTop?700:400}">${p?p.toLocaleString():'—'}</span>`
+               : `<input type="number" value="${p||''}" onchange="vsSetCell(${i},'${v}',this.value)"
+                    style="width:94px;padding:3px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;text-align:right;${FN};font-weight:${isTop?700:400}">`}
+          </td>`;
+        }).join('')}
+        <td style="${TD};text-align:left;font-size:10px">
+          ${top.filter(v=>max>0).map(v=>`<span style="display:inline-block;background:#F1F5F9;border-radius:999px;padding:1px 7px;margin:1px 2px 1px 0;color:var(--t2)">${v}</span>`).join('')}
+        </td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div></div>`;
+  });
+  el.innerHTML=h;
+}
+
+function initVendorSheet(){
+  const t=document.getElementById('vs-month'); if(t) t.textContent=curMonth||'';
+  const n=document.getElementById('vs-note');
+  if(n && document.activeElement!==n) n.value=(vsSheet&&vsSheet.note)||'';
+  if(n) n.disabled=!canEdit();
+  renderVendorSheet();
+}
+function vsNote(v){ if(!vsSheet)return; vsSheet.note=v; vsSaveDebounced(); }
+
+/* ── 회의자료 ④ 용 : 우리 vs 각 상부 ─────────────────────── */
+function vsForReport(){
+  if(!vsSheet||!vsSheet.rows.length) return null;
+  const V=vsSheet.vendors, OUR=vsSheet.our_vendor;
+  const others=V.filter(v=>v!==OUR);
+  const rows=vsSheet.rows.map(r=>({
+    cat:r.cat, grp:r.grp, product:r.product,
+    our: OUR? (+r.prices[OUR]||0) : null,
+    vals: others.map(v=>({name:v, val:+r.prices[v]||0}))
+  }));
+  // 상부별 평균 차액 (우리 − 상부)
+  const summary=others.map(v=>{
+    const ds=rows.filter(r=>r.our!=null && r.vals.find(x=>x.name===v).val)
+                 .map(r=>r.our - r.vals.find(x=>x.name===v).val);
+    return {name:v, n:ds.length,
+            avg: ds.length? Math.round(ds.reduce((a,b)=>a+b,0)/ds.length):0,
+            win: ds.filter(d=>d>0).length};
+  });
+  return {our:OUR, others, rows, summary, note:vsSheet.note, month:vsSheet.month};
 }
 
 </script>
