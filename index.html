@@ -287,92 +287,140 @@ th.sortable:hover,th.sortable.on{color:var(--pri-d)}
          padding:12px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .add-bar label{font-size:12.5px;font-weight:600;color:#4a5263}
 
-/* ── 수수료표 ─────────────────────────────────────────── */
-.tbl-wrap{overflow:auto;border-radius:16px;border:1px solid var(--line);background:var(--surface);
-          box-shadow:var(--shadow);transform:translateZ(0);-webkit-transform:translateZ(0)}
-.tbl-wrap table{border-collapse:separate!important;border-spacing:0!important;width:100%}
-table{width:100%;border-collapse:collapse}
-thead th{background:#f8f9fb;color:var(--sub);padding:10px 12px;font-size:12px;font-weight:600;
-         white-space:nowrap;position:sticky;top:0;z-index:10;
-         border-bottom:1px solid var(--line);text-align:left}
-thead th.th-sec{background:#eff2f7;color:var(--text)}
-tbody td{padding:8px 12px;border-bottom:1px solid #f1f3f6;font-size:13px;vertical-align:middle;
-         background:var(--surface)}
-tbody tr:last-child td{border-bottom:none}
+/* ── 수수료표 (v19) ─────────────────────────────────────
+   위쪽 박스 셋(그레이드·정책 추가·버튼 줄)을 표 카드 머리 하나로 합쳤다.
+   왼쪽 상품 열과 오른쪽 합계 열을 고정해, 정책이 많아도 합계가 늘 보인다. */
+.ft-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px 14px}
+.ft-head{display:flex;justify-content:space-between;align-items:center;gap:12px 16px;flex-wrap:wrap;margin-bottom:12px}
+.ft-title h2{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em}
+.ft-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.mpill{display:inline-flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);border-radius:999px;
+  padding:3px 10px;font-size:12px;color:var(--sub);white-space:nowrap}
+.mpill b{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+button.mpill{cursor:pointer;font:inherit;font-size:12px}
+button.mpill:hover{border-color:var(--pri);color:var(--pri-d)}
+.mpill.warn{background:var(--amber-w);border-color:#f6ddb8;color:#8a4b06}
+.ft-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ft-sep{width:1px;height:22px;background:var(--line);margin:0 2px}
+/* 스위치 */
+.sw{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#4a5263;cursor:pointer;user-select:none}
+.sw input{position:absolute;opacity:0;pointer-events:none}
+.sw i{position:relative;width:30px;height:18px;border-radius:999px;background:#d9dee7;transition:background .15s;flex:none}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 2px rgba(20,30,50,.2);transition:transform .15s}
+.sw input:checked+i{background:var(--pri)}
+.sw input:checked+i::after{transform:translateX(12px)}
+.ft-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12px;color:var(--sub)}
+.ft-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-2px;margin-right:5px}
+.ft-legend .lg-chg{background:#fff1e3;box-shadow:inset 0 0 0 1px #fbd3ad}
+.ft-legend .lg-new{background:var(--green-w);box-shadow:inset 0 0 0 1px #b9e3d0}
 
-.c-cat{background:#eff2f7!important;font-size:12px!important;font-weight:600!important;
-   color:var(--text)!important;text-align:center!important;vertical-align:middle!important;
-   border-right:1px solid var(--line)!important;white-space:nowrap!important;
-   position:sticky!important;z-index:4!important}
-.c-tv{background:#f8f9fb!important;font-size:12.5px!important;font-weight:500!important;
-   color:#4a5263!important;text-align:center!important;vertical-align:middle!important;
-   border-right:1px solid var(--line)!important;min-width:52px!important;white-space:nowrap!important;
-   position:sticky!important;left:152px!important;z-index:4!important}
-.c-in{font-size:13px!important;text-align:center!important;vertical-align:middle!important;
-   color:#4a5263!important;font-weight:500!important;background:#fafbfd!important;
-   min-width:46px!important;white-space:nowrap!important;
-   position:sticky!important;left:214px!important;z-index:4!important}
-tbody tr:hover .c-cat{background:#e5e9f0!important}
-tbody tr:hover .c-tv{background:#eff2f7!important}
-tbody tr:hover .c-in{background:#eff2f7!important}
-tbody tr:hover .c-pol{background:#f5f8fd}
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 220px);border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table.ft{border-collapse:separate;border-spacing:0;font-size:13px;width:max-content;min-width:100%}
+.ft th{position:sticky;top:0;z-index:5;background:#f8f9fb;color:var(--sub);font-size:11.5px;font-weight:600;
+  padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left;vertical-align:bottom}
+.ft td{height:34px;padding:0 10px;border-bottom:1px solid #f1f3f6;background:var(--surface);white-space:nowrap}
+.ft tbody tr:last-child td{border-bottom:0}
+.ft .L,.ft .R{position:sticky;z-index:3}
+.ft th.L,.ft th.R{z-index:7}
+.ft .edgeL{box-shadow:1px 0 0 var(--line),8px 0 10px -8px rgba(20,30,50,.14)}
+.ft .edgeR{box-shadow:-1px 0 0 var(--line),-8px 0 10px -8px rgba(20,30,50,.14)}
+.ft tr.sec-top td{border-top:1px solid #e1e6ee}
+.ft td.k-sec{font-size:12px;font-weight:700;color:var(--text);vertical-align:top;padding-top:9px;white-space:normal;line-height:1.35}
+.ft td.k-cat{font-size:12.5px;color:#4a5263;vertical-align:top;padding-top:9px;white-space:normal;line-height:1.35}
+.ft td.k-tv{color:#4a5263;vertical-align:top;padding-top:9px}
+.ft td.k-in{font-weight:600;color:var(--text)}
+.ft tbody tr:hover td.c-pol,.ft tbody tr:hover td.k-in{background:#f8faff}
+.ft th.n,.ft td.n{text-align:right;font-variant-numeric:tabular-nums}
 
-.c-pol{text-align:right!important;font-size:13px!important;cursor:pointer;color:var(--text);
-   font-variant-numeric:tabular-nums;min-width:82px}
-.c-pol:hover{background:var(--pri-w)!important;outline:1.5px solid var(--pri);outline-offset:-1px}
-.c-pol.editing{padding:0!important}
-.c-pol.editing input{width:100%;height:100%;border:none;background:var(--pri-w);font-size:13px;
-   text-align:right;padding:8px 12px;outline:1.5px solid var(--pri);outline-offset:-1px;
-   font-variant-numeric:tabular-nums}
-.c-pol.null-val{color:#d6dae1!important}
-.c-pol.sel-range{background:var(--pri-w2)!important;outline:1.5px solid var(--pri);outline-offset:-1px}
+.ft td.c-pol{text-align:right;font-variant-numeric:tabular-nums;cursor:pointer;min-width:84px}
+.ft td.c-pol:hover{background:var(--pri-w)!important;box-shadow:inset 0 0 0 1.5px var(--pri)}
+.ft td.c-pol.zero,.ft td.c-pol.null-val{color:#d3d8e0}
+.ft td.c-pol.chg{background:#fff6ec;color:#c2410c;font-weight:600}
+.ft td.c-pol.newc{background:#f3fbf7}
+.ft td.c-pol.sel-range{background:var(--pri-w2)!important;box-shadow:inset 0 0 0 1px var(--pri)}
+.ft td.c-pol.editing{padding:0}
+.ft td.c-pol.editing input{width:100%;height:33px;border:0;outline:1.5px solid var(--pri);outline-offset:-1.5px;background:var(--pri-w);
+  text-align:right;padding:0 10px;font-variant-numeric:tabular-nums;font-size:13px}
+.ft td.c-gift{text-align:right;font-variant-numeric:tabular-nums;color:var(--pri-d);background:#f7f9ff;cursor:pointer;font-size:12.5px}
+.ft td.c-gift:hover{box-shadow:inset 0 0 0 1.5px var(--pri)}
+.ft td.c-gift.editing{padding:0}
+.ft td.c-gift.editing input{width:100%;height:33px;border:0;outline:1.5px solid var(--pri);outline-offset:-1.5px;background:var(--pri-w);text-align:right;padding:0 10px}
+.ft td.c-grade{text-align:right;font-variant-numeric:tabular-nums;color:var(--pri-d);font-weight:600;background:#f7f9ff}
+.ft td.c-tot{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:#23407a;background:#eaf1ff;font-size:13.5px}
+.ft td.c-tot-gift{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#2b5797;background:#f4f7ff}
+.ft th.h-gift,.ft th.h-grade{background:#f2f5fc;color:var(--pri-d)}
+.ft th.h-tot{background:#e3ecff;color:#23407a}
+.ft th.h-tot2{background:#eef3ff;color:#2b5797}
+.ft th small{display:block;font-size:10.5px;font-weight:500;opacity:.75;margin-top:1px}
+body.readonly .ft td.c-pol,body.readonly .ft td.c-gift{cursor:default}
+body.readonly .ft td.c-pol:hover,body.readonly .ft td.c-gift:hover{box-shadow:none;background:inherit!important}
 
-.c-gift{text-align:right!important;font-size:12px!important;cursor:pointer;color:var(--pri-d);
-   font-variant-numeric:tabular-nums;background:#f5f8ff!important;
-   border-right:1px solid var(--line)!important;position:sticky!important;left:272px!important;
-   z-index:4!important;min-width:72px;width:72px;box-shadow:3px 0 8px -4px rgba(20,30,50,.12)}
-.c-gift:hover{background:var(--pri-w2)!important;outline:1.5px solid var(--pri);outline-offset:-1px}
-.c-gift.editing{padding:0!important}
-.c-gift.editing input{width:100%;height:100%;border:none;background:var(--pri-w2);font-size:12px;
-   text-align:right;padding:7px 10px;outline:1.5px solid var(--pri);outline-offset:-1px;
-   font-variant-numeric:tabular-nums}
-.c-grade{background:var(--pri-w)!important;text-align:right!important;font-size:13px!important;
-   color:var(--pri-d)!important;font-weight:700!important;font-variant-numeric:tabular-nums}
-.c-tot-gift{background:#eef3fb!important;color:#2b5797!important;text-align:right!important;
-   font-size:13px!important;font-weight:700!important;font-variant-numeric:tabular-nums;
-   border-left:1px solid var(--line)!important}
-tbody tr:hover .c-tot-gift{background:#e3ebf7!important}
-.c-tot{background:var(--pri-w2)!important;color:#23407a!important;text-align:right!important;
-   font-size:13.5px!important;font-weight:700!important;font-variant-numeric:tabular-nums;
-   border-left:2px solid var(--pri)!important}
-tbody tr:hover .c-tot{background:#cbdcff!important;color:#23407a!important}
-tr.sec-top td{border-top:1.5px solid #dbe3ef!important}
+/* 정책 머리 */
+.ft th.th-pol{text-align:right;min-width:84px;cursor:default}
+.ph{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.ph .pn{color:var(--text);font-weight:700;font-size:12px}
+.ph .pm{font-weight:500;color:var(--dim);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis}
+body:not(.readonly) .ph .pn,body:not(.readonly) .ph .pm{cursor:text}
+body:not(.readonly) .ph:hover .pn{color:var(--pri-d)}
+.th-tags{display:flex;gap:3px;justify-content:flex-end;margin-bottom:3px;min-height:15px}
+.th-tags .scope{font-size:9.5px;font-weight:700;border-radius:5px;padding:1px 5px;cursor:pointer;background:var(--pri-w);color:var(--pri-d)}
+.th-tags .scope.branch{background:var(--violet-w);color:var(--violet)}
+.th-tags .chk{font-size:9.5px;font-weight:800;border-radius:5px;padding:1px 6px;cursor:pointer;background:var(--amber-w);color:var(--amber)}
+.th-tags .chk.on{background:var(--green-w);color:var(--green)}
+.th-tags .newp{font-size:9.5px;font-weight:800;border-radius:5px;padding:1px 5px;background:var(--green-w);color:var(--green)}
+.ft th.th-need{background:#fffaf2}
+.ft th.th-pol.editing{background:var(--pri-w);vertical-align:middle;padding:6px}
+.ph-edit{display:flex;flex-direction:column;gap:4px;width:150px}
+.ph-edit input{font:inherit;font-size:12px;border:1px solid var(--line2);border-radius:7px;padding:4px 7px;outline:0;background:#fff;color:var(--text)}
+.ph-edit input:focus{border-color:var(--pri)}
+.ph-edit .row{display:flex;gap:4px;justify-content:flex-end}
+.ph-edit button{border:0;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer}
+.ph-edit .ok{background:var(--pri);color:#fff}.ph-edit .del{background:none;color:var(--up)}
+.ft th.th-add{min-width:46px;text-align:center;vertical-align:middle}
+.addcol{width:26px;height:26px;border-radius:8px;border:1.5px dashed #c5cdd9;background:#fff;color:var(--sub);cursor:pointer;font-size:15px;line-height:1}
+.addcol:hover{border-color:var(--pri);border-style:solid;color:#fff;background:var(--pri)}
 
-.th-pol{position:relative;min-width:82px;text-align:right!important}
-.th-pol .rm-pol{display:none;position:absolute;top:50%;right:4px;transform:translateY(-50%);
-   background:var(--up);border:none;border-radius:4px;color:#fff;font-size:10px;width:16px;
-   height:16px;cursor:pointer;line-height:16px;text-align:center;padding:0}
-thead th.th-pol:hover .rm-pol{display:block}
+/* ── 그레이드 매트릭스 (v19) : ┌ 모양으로 머리와 왼쪽 열이 한 몸으로 고정 ── */
+.matrix-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);max-height:calc(100vh - 230px)}
+.mx-tbl{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
+.mx-tbl th,.mx-tbl td{padding:7px 9px;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;border-bottom:1px solid #f1f3f6}
+.mx-tbl thead th{position:sticky;top:0;z-index:4;background:#f8f9fb;color:var(--sub);font-weight:600;border-bottom:1px solid var(--line)}
+.mx-tbl th.mx-th-row{position:sticky;left:0;z-index:3;background:#f8f9fb;color:var(--sub);font-weight:600;box-shadow:inset -1px 0 0 var(--line)}
+.mx-tbl thead th.mx-corner{left:0;z-index:6;color:var(--dim);font-size:11px;box-shadow:inset -1px 0 0 var(--line)}
+.mx-tbl .mx-th-col,.mx-tbl .mx-th-row{cursor:pointer}
+.mx-tbl .mx-th-col:hover,.mx-tbl .mx-th-row:hover{color:var(--pri-d)}
+.mx-tbl .mx-th-col.hi,.mx-tbl .mx-th-row.on{background:#e7efff;color:var(--pri-d);font-weight:700}
+.mx-cell{cursor:pointer;color:#3a4252;background:var(--surface)}
+.mx-cell:hover{background:var(--pri-w)}
+.mx-cell.hi{background:#f5f8ff}
+.mx-cell.up{background:#ecf8f2;color:#17805a;font-weight:600}
+.mx-cell.dn{background:#fdeeee;color:#c93a3f;font-weight:600}
+.mx-cell.sel{background:var(--pri)!important;color:#fff!important;font-weight:700;border-radius:8px;box-shadow:0 4px 10px -4px rgba(76,130,247,.6)}
+.mx-cell.nil{color:#d3d8e0}
+.mx-cell.nil:hover{background:var(--soft)}
+.mx-old .mx-cell,.mx-old .mx-th-col,.mx-old .mx-th-row{cursor:default}
+.mx-old .mx-cell:hover{background:inherit}
 
-/* ── 그레이드 매트릭스 ────────────────────────────────── */
-.matrix-wrap{overflow:auto;border-radius:16px;border:1px solid var(--line);
-             background:var(--surface);box-shadow:var(--shadow)}
-.mx-tbl{border-collapse:collapse;font-size:11.5px}
-.mx-tbl td,.mx-tbl th{padding:5px 8px;border:.5px solid #eef1f6;text-align:center;
-   white-space:nowrap;font-variant-numeric:tabular-nums}
-.mx-tbl th{background:#f8f9fb;color:var(--sub);font-weight:600}
-.mx-th-row{background:var(--pri);color:#fff;cursor:pointer;font-size:11.5px;font-weight:600}
-.mx-th-row:hover{background:var(--pri-d)}
-.mx-th-row.on{background:var(--pri-w)!important;color:var(--pri-d)!important;font-weight:700!important}
-.mx-th-col{background:var(--pri);color:#fff;cursor:pointer;min-width:46px;font-size:11.5px;font-weight:600}
-.mx-th-col:hover,.mx-th-col.hi{background:var(--pri-w);color:var(--pri-d)}
-.mx-cell{cursor:pointer;background:var(--surface);color:var(--text)}
-.mx-cell:hover{background:var(--pri-w)!important}
-.mx-cell.sel{background:var(--pri)!important;color:#fff!important;font-weight:700!important}
-.mx-cell.hi{background:var(--pri-w2)!important}
-.mx-cell.nil{color:#c8cdd6}
-.mx-cell.nil:hover{background:var(--soft)!important}
-.mx-cell.nil.sel{background:var(--sub)!important;color:#fff!important}
+/* 그레이드 화면 머리 : 표 버전 고르기 */
+.gv{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gv .lbl{font-size:12.5px;font-weight:700;color:var(--sub);margin-right:2px}
+.gv button{border:1px solid var(--line2);background:#fff;border-radius:10px;padding:6px 12px;font-weight:600;font-size:12.5px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.gv button:hover{border-color:var(--pri)}
+.gv button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.gv button small{font-size:11px;font-weight:600;opacity:.75}
+.gv-leg{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--sub);margin-left:auto}
+.gv-leg .u{background:#ecf8f2;box-shadow:inset 0 0 0 1px #b9e3d0}.gv-leg .d{background:#fdeeee;box-shadow:inset 0 0 0 1px #f6c6c7}
+.gv-old{display:flex;align-items:center;gap:10px;background:var(--amber-w);color:#8a4b06;border-radius:12px;padding:8px 12px;font-size:12.5px;margin-bottom:12px}
+.gv-old .ghost{margin-left:auto}
+/* 한 단계 더 */
+.nx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.nx>div{background:var(--soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.nx span{font-size:12px;color:var(--sub)}
+.nx b{font-size:17px;font-variant-numeric:tabular-nums}
+.nx small{font-size:11.5px;color:var(--sub)}
+.nx>div.hot{background:#fff1f1}.nx>div.hot b{color:var(--up)}
+.nx>div.none b{color:var(--dim);font-size:14px}
 
 /* ── 모달 ─────────────────────────────────────────────── */
 .mo{position:fixed;inset:0;background:rgba(15,20,30,.3);z-index:1000;display:none;
@@ -625,21 +673,6 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .strip b{color:var(--text)}
 .strip .sp{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
 
-/* 그레이드 매트릭스 : 레퍼런스 표처럼 연한 머리 + 선택만 파랑 */
-.matrix-wrap{border:0;box-shadow:var(--shadow);border-radius:var(--r);padding:6px}
-.mx-tbl{border-collapse:separate;border-spacing:0;font-size:12px}
-.mx-tbl td,.mx-tbl th{border:0;border-bottom:1px solid #f1f3f6;padding:6px 8px}
-.mx-tbl thead th{position:sticky;top:0;z-index:2}
-.mx-corner{background:#f8f9fb!important;color:var(--sub)!important;position:sticky;left:0;z-index:4!important;font-weight:600;min-width:58px}
-.mx-th-col,.mx-th-row{background:#f8f9fb;color:var(--sub);font-weight:600}
-.mx-th-row{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--line)}
-.mx-th-row:hover,.mx-th-col:hover{background:var(--pri-w);color:var(--pri-d)}
-.mx-th-row.on,.mx-th-col.hi{background:var(--pri-w2)!important;color:var(--pri-d)!important;font-weight:700}
-.mx-cell{border-radius:0;color:#3a4252}
-.mx-cell.hi{background:#f3f7ff!important}
-.mx-cell.sel{background:var(--pri)!important;color:#fff!important;border-radius:8px;box-shadow:0 4px 10px -4px rgba(76,130,247,.6)}
-.mx-cell.nil{color:#d0d5dd}
-
 /* 시장가 비교 */
 .cmp-grp{margin-bottom:16px}
 .cmp-grp .t td{vertical-align:middle}
@@ -678,9 +711,44 @@ body.mode-report .t th{background:#F6F8FB;color:#374151}
 
 
 .ghost.sm.on{border-color:var(--pri);color:var(--pri-d);background:var(--pri-w)}
-body.month-new #page-table .grade-bar,body.month-new #page-table .add-bar,
-body.month-new #page-table .add-bar+div{display:none!important}
+body.month-new #ft-tools,body.month-new #ft-meta,body.month-new #ft-legend{display:none!important}
+body.month-new .ft-card{background:none;box-shadow:none;padding:0}body.month-new .ft-head{display:none}
 [hidden]{display:none!important}
+/* v19 — 머리 · 달력 · 스크롤바 */
+.top>div:first-child{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:10px}
+.top>div:first-child .sub{grid-column:1/-1}
+.top h1{display:inline}
+#month-chip{justify-self:start}
+#save-status:empty{display:none}
+/* 기록 없는 달은 흐리게, 있는 달은 진하게 + 점 */
+.mp-m{color:#b8bec9}
+.mp-m.has{color:var(--text);font-weight:600}
+.mp-m.now:not(.on){color:var(--pri-d)}
+.mp-m.now:not(.on):not(.has){color:#9db9fb;font-weight:600}
+body.mode-report .mp-m{color:rgba(255,255,255,.45)}
+body.mode-report .mp-m.has{color:#fff}
+body.mode-report .mp-m.on{color:var(--pri-d)!important}
+.mp-m.on{color:#fff!important}
+/* 스크롤바 : 흰색으로 티 안 나게 */
+*{scrollbar-width:thin;scrollbar-color:#eceff4 transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#fff;border:1px solid #e8ebf0;border-radius:8px;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:#f6f8fb;border-color:#d9dee6}
+.sb *{scrollbar-color:#eceff4 transparent}
+body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
+
+
+/* 큰 묶음 칸 : 아래로 스크롤해도 이름이 위에 붙어 따라온다 */
+.ft td .stk{position:sticky;top:66px}
+.ft td.k-sec,.ft td.k-cat,.ft td.k-tv{padding-top:0;padding-bottom:0}
+.ft td .stk{padding:9px 0}
+.gv-leg>span>i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-2px;margin-right:4px}
+.gv-leg i:not(.u):not(.d){width:30px;height:18px}
+.nx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nx span{white-space:nowrap}
+body.readonly #copy-bar{display:none!important}
+body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
 /* ── 인쇄 ─────────────────────────────────────────────── */
 @media print{
   .sb,.top-r,.add-bar,.gb-sel,.rm-pol,#ro-banner{display:none!important}
@@ -793,18 +861,10 @@ window.SKY_CONFIG = {
         <button class="icon" id="cal-next" onclick="calShift(1)" title="다음 해">›</button>
       </div>
       <div class="mp-g" id="cal-grid"></div>
-      <p class="mp-n" id="cal-note"></p>
       <input type="month" id="month-in" onchange="setMonth()" hidden>
     </div>
 
-    <div class="sb-info">
-      <div><span>정책월</span><b id="si-month">—</b></div>
-      <div><span id="si-l1">그레이드 목표</span><b id="si-sel">—</b></div>
-      <div><span id="si-l2">그레이드 단가</span><b id="si-unit">—</b></div>
-      <div><span id="si-l3">본부 목표</span><b id="si-goal">—</b></div>
-      <p class="note" id="si-note">그레이드 표는 선택한 달에 맞춰 자동으로 적용됩니다.</p>
-    </div>
-  </div>
+      </div>
 
   <div class="sb-bottom">
     <div class="me">
@@ -827,17 +887,16 @@ window.SKY_CONFIG = {
   <div class="content">
     <div class="top">
       <div>
-        <h1 id="tb-title">수수료표</h1>
+        <h1 id="tb-title">수수료표</h1><span id="month-chip" class="mchip"></span>
         <p class="sub" id="tb-sub">정책 항목별 단가를 월별로 관리합니다</p>
       </div>
       <div class="top-r">
-        <span id="month-chip" class="mchip"></span>
         <span id="save-status"></span>
         <span id="sync-dot" title="Supabase 연결 상태" onclick="sbRefreshAll()">●</span>
         <button class="ghost sm" onclick="exportImage()" id="btn-img">이미지</button>
         <button class="ghost sm" onclick="rpSaveExcel()" id="btn-xls" hidden>엑셀</button>
         <button class="ghost sm" onclick="window.print()">인쇄</button>
-        <span id="app-ver" title="월별 기록 · 디자인 통일">v18</span>
+        <span id="app-ver" hidden>v19</span>
       </div>
     </div>
 
@@ -848,68 +907,36 @@ window.SKY_CONFIG = {
 
     <!-- ── 수수료표 ── -->
     <div class="page on" id="page-table">
-      <div class="grade-bar">
-        <div class="gb-item">
-          <div class="gb-label">그레이드 목표 · 인터넷</div>
-          <div class="gb-val" id="g-in">—</div>
-          <div class="gb-unit">건</div>
-        </div>
-        <div class="gb-divider"></div>
-        <div class="gb-item">
-          <div class="gb-label">그레이드 목표 · TV</div>
-          <div class="gb-val" id="g-tv">—</div>
-          <div class="gb-unit">건</div>
-        </div>
-        <div class="gb-divider"></div>
-        <div class="gb-item">
-          <div class="gb-label">그레이드 단가</div>
-          <div class="gb-val" id="g-unit">—</div>
-          <div class="gb-unit">원/건</div>
-        </div>
-        <div class="gb-divider"></div>
-        <div class="gb-item">
-          <div class="gb-label">지급 총액</div>
-          <div class="gb-val" id="g-total">—</div>
-          <div class="gb-unit">만원</div>
-        </div>
-        <div class="gb-sel">
-          <button class="ghost sm" onclick="openCopyFrom()" title="저장된 다른 달의 수수료표를 가져옵니다">다른 달에서 가져오기</button>
-          <button class="ghost sm" onclick="openCrosscheck()" title="정책번호별로 세로로 늘어놓아 정산서와 대조합니다">대조 보기</button>
-          <button class="ghost sm" onclick="go('grade')">목표 설정 →</button>
-          <button class="ghost sm" id="btn-collapse" onclick="togglePolCols()">◀ 접기</button>
-        </div>
-      </div>
       <div id="copy-bar" class="foot-note" style="display:none;margin:0 0 14px;align-items:center;background:var(--amber-w);color:#8a4b06"></div>
-      <style id="col-collapse-style"></style>
-      <div class="add-bar">
-        <label>정책 추가</label>
-        <input class="fi" id="np-id" placeholder="정책ID (예: IN-09)" style="width:130px;">
-        <input class="fi" id="np-num" placeholder="정책번호" style="width:130px;">
-        <input class="fi" id="np-name" placeholder="정책명" style="width:160px;">
-        <button class="btn btn-p sm" onclick="addPol()">+ 추가</button>
-        <span class="hint">헤더 위에서 ✕ 클릭으로 삭제 · 셀 클릭으로 금액 편집 · 빈칸으로 지우면 기본값 제거됨</span>
+      <div class="ft-card">
+        <div class="ft-head">
+          <div class="ft-title">
+            <h2 id="ft-title">수수료표</h2>
+            <div class="ft-meta" id="ft-meta"></div>
+          </div>
+          <div class="ft-tools" id="ft-tools">
+            <label class="sw" title="상품권 열과 상품권 포함 합계를 보이거나 숨깁니다"><input type="checkbox" id="sw-gift" onchange="setShowGift(this.checked)"><i></i>상품권</label>
+            <label class="sw" title="정책별 열을 접고 합계만 봅니다"><input type="checkbox" id="sw-cols" checked onchange="setShowPols(this.checked)"><i></i>정책 열</label>
+            <span class="ft-sep"></span>
+            <button class="ghost sm" onclick="openCopyFrom()">다른 달에서 가져오기</button>
+            <button id="fee-edit-btn" class="ghost sm" onclick="toggleFeeEdit()">상품 행 편집</button>
+            <button class="ghost sm" onclick="exportFeeTableToExcel()">엑셀</button>
+          </div>
+        </div>
+        <div class="tbl-wrap" id="tbl-wrap"></div>
+        <div class="ft-legend" id="ft-legend"></div>
       </div>
-      <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:6px;gap:8px">
-        <span style="font-size:11px;color:var(--t3)" id="fee-month-label"></span>
-        <button class="ghost sm" onclick="exportFeeTableToExcel()">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><path d="M2 12v2h12v-2M8 2v8M5 7l3 3 3-3"/></svg>엑셀 저장
-        </button>
-        <button id="fee-edit-btn" class="ghost sm" onclick="toggleFeeEdit()">상품 행 편집</button>
-      </div>
-      <div class="tbl-wrap" id="tbl-wrap"></div>
+      <span hidden id="g-in"></span><span hidden id="g-tv"></span><span hidden id="g-unit"></span><span hidden id="g-total"></span>
+      <span hidden id="fee-month-label"></span><span hidden id="btn-collapse"></span>
     </div>
 
     <!-- ── 그레이드 단가 ── -->
     <div class="page" id="page-grade">
-      <div class="strip">
-        <span class="ib c1" style="margin:0"><svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><path d="M2 13 5 9 8 10 11 5 14 3"/></svg></span>
-        <span>칸을 누르면 그 달 그레이드 목표가 되고, 수수료표에 단가가 자동 반영됩니다 · 지급총액은 <b>인터넷 55% : TV 45%</b> 로 나눕니다</span>
-        <span class="sp"><span>적용 중인 표 <b id="mx-ver-label">—</b></span>
-          <button class="ghost sm" onclick="openGradeHistory()">이전 표 보기</button></span>
-      </div>
+      <div class="strip"><div class="gv" id="gv" style="width:100%"></div><span hidden id="mx-ver-label"></span></div>
+      <div id="gv-old"></div>
       <div class="grade-grid">
-        <div class="matrix-wrap" style="overflow:auto;max-height:calc(100vh - 210px)">
-          <table class="mx-tbl" id="mx-tbl" style="min-width:700px;"></table>
+        <div class="matrix-wrap">
+          <table class="mx-tbl" id="mx-tbl"></table>
         </div>
         <div id="gradeDiffSection" style="min-width:420px"></div>
       </div>
@@ -1114,20 +1141,6 @@ window.SKY_CONFIG = {
   </div>
   <!-- /content -->
 
-  <div class="mo" id="xc-modal" onclick="if(event.target===this)closeCrosscheck()">
-    <div class="md" style="width:720px">
-      <div class="m-hd">
-        <div>
-          <div class="m-title">대조 보기</div>
-          <p class="sub" style="margin:2px 0 0">정산서는 정책항목별로 나열됩니다. 한 줄씩 맞춰 보세요.</p>
-        </div>
-        <button class="m-x" onclick="closeCrosscheck()">✕</button>
-      </div>
-      <div class="m-body">
-        <select class="fi" id="xc-sel" style="width:100%;margin-bottom:12px" onchange="xcPick(this.value)"></select>
-        <div id="xc-body"></div>
-      </div>
-    </div>
   </div>
 </div>
 <!-- /main -->
@@ -1295,9 +1308,10 @@ function canEdit(){ return !!sbIsAdmin; }
 /* ── 상태 표시 ───────────────────────────────────────────── */
 function showGsStatus(msg, ok=true){
   const el=document.getElementById('save-status'); if(!el)return;
-  el.textContent=msg; el.style.opacity='1'; el.style.color=ok?'':'#EF4444';
+  el.textContent=msg; el.style.display=''; el.style.opacity='1'; el.style.color=ok?'':'#EF4444';
   clearTimeout(window._saveStatusTimer);
-  window._saveStatusTimer=setTimeout(()=>{el.style.opacity='0';el.style.color='';},3000);
+  window._saveStatusTimer=setTimeout(()=>{ el.style.opacity='0';
+    setTimeout(()=>{ el.style.display='none'; el.style.color=''; },300); },2600);
 }
 function showSaved(){ showGsStatus('✓ 저장됨'); }
 
@@ -1418,7 +1432,7 @@ function matrixForMonth(ym){
 function applyMatrixForMonth(ym){
   const m=matrixForMonth(ym);
   if(!m) return false;
-  SKY.activeMx=m;
+  SKY.activeMx=m; mxViewId=null; mxShowRev=false;
   rebuildMX(m.data);
   const lbl=document.getElementById('mx-ver-label');
   if(lbl) lbl.textContent=m.label;
@@ -1667,37 +1681,6 @@ function mxFloor(list, n){
 const floorIN=n=>mxFloor(IN_ALL,n), floorTV=n=>mxFloor(TV_ALL,n);
 
 /* ── 그레이드 표 이력 보기 ───────────────────────────────── */
-function openGradeHistory(){
-  if(!SKY.matrices.length){ alert('그레이드 표를 아직 불러오지 못했습니다.'); return; }
-  const list=[...SKY.matrices].reverse();   // 최신 먼저
-  const act=SKY.activeMx&&SKY.activeMx.id;
-  openModal('그레이드 표 이력',
-    '<div class="rmonths" id="gh-pick">'+list.map(m=>'<button data-id="'+m.id+'">'+esc(m.label)
-      +(m.id===act?' · 적용 중':'')+'</button>').join('')+'</div>'
-   +'<p class="sub" id="gh-note" style="margin:10px 0 12px"></p>'
-   +'<div class="matrix-wrap" style="overflow:auto;max-height:62vh;box-shadow:none;border:1px solid var(--line)"><table class="mx-tbl" id="gh-tbl"></table></div>',
-    {wide:true});
-  const draw=(id)=>{
-    const m=SKY.matrices.find(x=>String(x.id)===String(id)); if(!m) return;
-    document.querySelectorAll('#gh-pick button').forEach(b=>b.classList.toggle('on', b.dataset.id===String(m.id)));
-    const t={}, d=m.data;   // 이 버전만의 조회표 (화면 계산용 MX는 건드리지 않는다)
-    [[d.R8A,d.C8A],[d.R8B,d.C8B],[d.R2K,d.C2K]].forEach(([rs,cs])=>{
-      if(!rs||!cs) return;
-      rs.forEach(([iv,vs])=>vs&&vs.forEach((v,i)=>{ if(v!=null&&cs[i]!=null) t[iv+'_'+cs[i]]=v; }));
-    });
-    const ef=m.effective_from.split('-');
-    const from=m.effective_from==='2000-01'?'처음부터':(ef[0]+'년 '+parseInt(ef[1])+'월부터');
-    document.getElementById('gh-note').textContent=from+' 적용'+(m.note?' · '+m.note:'')+' · 단위 만원';
-    let h='<thead><tr><th class="mx-corner">인터넷＼TV</th>'+TV_ALL.map(tv=>'<th class="mx-th-col">'+tv+'</th>').join('')+'</tr></thead><tbody>';
-    IN_ALL.forEach(iv=>{
-      h+='<tr><th class="mx-th-row">'+iv+'</th>'+TV_ALL.map(tv=>{ const v=t[iv+'_'+tv];
-        return '<td class="mx-cell'+(v?'':' nil')+'" style="cursor:default">'+(v?v.toLocaleString():'-')+'</td>'; }).join('')+'</tr>';
-    });
-    document.getElementById('gh-tbl').innerHTML=h+'</tbody>';
-  };
-  document.querySelectorAll('#gh-pick button').forEach(b=>b.onclick=()=>draw(b.dataset.id));
-  draw(act||list[0].id);
-}
 
 // ══════ 상품 행 데이터 ══════
 // rows: 실제 렌더링되는 행만 (헤더/rowspan 행 없음)
@@ -1851,19 +1834,74 @@ function valOf(st, polId, ri){
   return (DEF[ri]&&DEF[ri][polId])||0;
 }
 
-// ══════ 수수료표 렌더링 ══════
+// ══════ 수수료표 렌더링 (v19) ══════
+let showGift=(()=>{ try{ return localStorage.getItem('sky_showGift')!=='0'; }catch(e){ return true; } })();
+let editingPol=null, newPolId=null;
+function setShowGift(v){ showGift=!!v; try{ localStorage.setItem('sky_showGift', v?'1':'0'); }catch(e){} renderTable(); }
+function setShowPols(v){ colsCollapsed=!v; renderTable(); }
+
+/* 직전 기록 달 — 이 달에서 금액이 바뀐 칸을 표시하는 데 쓴다 */
+let _prevSt=null;
+function prevMonthState(){
+  const pm=latestSavedBefore(curMonthKey()); if(!pm) return null;
+  const st=stOf(pm); if(!st) return null;
+  st.idx=new Map(); st.ROWS.forEach((_,i)=>st.idx.set(rowKeyOf(i,st.ROWS),i));
+  st.ids=new Set(st.pols.map(p=>p.id));
+  return st;
+}
+/* 칸 하나의 표시 (값 · 0원 흐리게 · 전월과 다름 · 새 정책) */
+function cellMeta(pid, ri){
+  const v=getVal(pid,ri);
+  const isNull=polVals[pid]&&polVals[pid][ri]===null;
+  let cls='c-pol'+(!v?' zero':''), title='';
+  const P=_prevSt;
+  if(P){
+    if(!P.ids.has(pid)) cls+=' newc';
+    else{
+      const pi=P.idx.get(rowKeyOf(ri));
+      if(pi!=null){ const pv=valOf(P,pid,pi); if(pv!==v){ cls+=' chg'; title=ymLabel(P.ym)+' '+fmtN(pv)+' → '+fmtN(v); } }
+    }
+  }
+  if(!title) title= isNull? '0원으로 지정' : (polVals[pid]&&polVals[pid][ri]!==undefined? '직접 입력한 금액':'기본값');
+  return {v, cls, title, txt: v? v.toLocaleString() : '–'};
+}
+function applyCellView(td,pid,ri){
+  const m=cellMeta(pid,ri);
+  td.className=m.cls; td.title=m.title; td.textContent=m.txt;
+  td.setAttribute('onclick','startEdit(this,\''+pid+'\','+ri+')');
+}
+
+function renderFtHead(){
+  const t=document.getElementById('ft-title'); if(t) t.textContent=(curMonth||'')+' 수수료표';
+  const sg=document.getElementById('sw-gift'); if(sg) sg.checked=showGift;
+  const sc=document.getElementById('sw-cols'); if(sc) sc.checked=!colsCollapsed;
+  const m=document.getElementById('ft-meta'); if(!m) return;
+  const tot=(selIN&&selTV)? mxLookup(selIN,selTV) : null;
+  let h= (selIN&&selTV)
+    ? '<button class="mpill" onclick="go(\'grade\')" title="그레이드 목표 바꾸기">그레이드 <b>'+fmtN(selIN)+' × '+fmtN(selTV)+'</b></button>'
+      +'<span class="mpill">건당 <b>'+fmtN(gradeU)+'원</b> · 총액 <b>'+(tot?fmtN(tot)+'만원':'0원')+'</b></span>'
+    : '<button class="mpill warn" onclick="go(\'grade\')">그레이드 목표를 아직 안 잡았습니다 →</button>';
+  if(_prevSt){
+    let n=0;
+    policies.filter(p=>p.apply).forEach(p=>ROWS.forEach((_,i)=>{ if(cellMeta(p.id,i).cls.includes(' chg')) n++; }));
+    h+='<span class="mpill" title="직전 기록 달과 금액이 다른 칸">'+ymLabel(_prevSt.ym)+' 대비 바뀐 칸 <b>'+n+'</b></span>';
+  }
+  m.innerHTML=h;
+}
+
 function renderTable(){
-  // 편집 모드면 편집 뷰 렌더링
   if(_feeEditMode){ renderFeeEditView(); return; }
-  // 수수료표 월 라벨 업데이트
-  const fml=document.getElementById('fee-month-label');
-  if(fml&&curMonth) fml.textContent=curMonth+' 기준';
   renderCopyBar();
   document.body.classList.toggle('month-new', !!monthIsNew);
+  _prevSt = monthIsNew? null : prevMonthState();
+  renderFtHead();
   if(monthIsNew){ renderEmptyMonth(); return; }
-  const activePols=policies.filter(p=>p.apply);
 
-  // rowspan 계산
+  const act=policies.filter(p=>p.apply);
+  const showPols=!colsCollapsed;
+  const ro=!canEdit();
+
+  // rowspan
   const secSpan=[], catSpan=[], tvSpan=[];
   for(let i=0;i<ROWS.length;i++){
     const r=ROWS[i];
@@ -1872,114 +1910,130 @@ function renderTable(){
     if(r.tv!==null){let s=1;while(i+s<ROWS.length&&ROWS[i+s].tv===null&&ROWS[i+s].sec===null)s++;tvSpan[i]=s;}else tvSpan[i]=0;
   }
 
-  const hasTV=ROWS.some(r=>r.tv!==null);
-  const hasIn=ROWS.some(r=>r.in!==null);
+  // 고정 열 위치
+  const W={sec:80,cat:76,tv:66,in:60,gift:78,grade:80,tot:96,tot2:96};
+  const L={sec:0, cat:W.sec, tv:W.sec+W.cat, in:W.sec+W.cat+W.tv, gift:W.sec+W.cat+W.tv+W.in};
+  const lastL= showGift? 'gift' : 'in';
+  const R={tot2:0, tot:showGift?W.tot2:0}; R.grade=R.tot+W.tot;
+  const Ls=(k)=>'left:'+L[k]+'px;width:'+W[k]+'px;min-width:'+W[k]+'px;max-width:'+W[k]+'px';
+  const Rs=(k)=>'right:'+R[k]+'px;width:'+W[k]+'px;min-width:'+W[k]+'px';
+  const eL=k=>k===lastL?' edgeL':'';
 
-  // 접기 모드: 정책 컬럼 숨기고 합계만
-  const showPols=!colsCollapsed;
+  // 머리
+  let th='<th class="L" style="'+Ls('sec')+'">대분류</th><th class="L" style="'+Ls('cat')+'">구분</th>'
+       + '<th class="L" style="'+Ls('tv')+'">TV</th><th class="L'+eL('in')+'" style="'+Ls('in')+'">인터넷</th>'
+       + (showGift? '<th class="L n h-gift edgeL" style="'+Ls('gift')+'">상품권<small>합계 제외</small></th>':'');
+  if(showPols){
+    act.forEach(p=>{
+      if(editingPol===p.id){
+        th+='<th class="th-pol editing" data-pid="'+p.id+'"><div class="ph-edit">'
+          + '<input id="pe-num" placeholder="정책번호 (예: Mass-03)" value="'+esc(p.num||'')+'">'
+          + '<input id="pe-name" placeholder="정책명" value="'+esc(p.name||'')+'">'
+          + '<div class="row">'+(p.id===newPolId?'':'<button class="del" onmousedown="event.preventDefault();removePol(\''+p.id+'\')">삭제</button>')
+          + '<button class="ok" onmousedown="event.preventDefault();commitPolEdit()">확인</button></div></div></th>';
+        return;
+      }
+      const sc=polScope(p), ck=!!polChecked[p.id], need=copiedFrom&&!ck;
+      const isNew=_prevSt && !_prevSt.ids.has(p.id);
+      th+='<th class="th-pol'+(need?' th-need':'')+'" data-pid="'+p.id+'"><div class="th-tags">'
+        + (isNew? '<span class="newp" title="'+ymLabel(_prevSt.ym)+'에는 없던 정책">새</span>':'')
+        + '<span class="scope '+sc+'" onclick="cyclePolScope(\''+p.id+'\')" title="누르면 본사↔본부">'+scopeLabel(sc)+'</span>'
+        + (copiedFrom? '<span class="chk'+(ck?' on':'')+'" onclick="polCheck(\''+p.id+'\')" title="'+(ck?'금액 확인함':'금액 확인 필요 — 누르면 확인 표시')+'">'+(ck?'✓':'!')+'</span>':'')
+        + '</div><div class="ph" '+(ro?'':'onclick="editPolHead(\''+p.id+'\')" title="눌러서 정책번호·이름 고치기"')+'>'
+        + '<span class="pn">'+esc(p.num||p.id)+'</span><span class="pm">'+esc(p.name||'')+'</span></div></th>';
+    });
+    if(!ro) th+='<th class="th-add"><button class="addcol" onclick="addPolColumn()" title="정책 열 추가">+</button></th>';
+  }
+  th+='<th class="R n h-grade edgeR" style="'+Rs('grade')+'">그레이드<small>'+(selIN&&selTV? fmtN(selIN)+'×'+fmtN(selTV):'목표 없음')+'</small></th>'
+     + '<th class="R n h-tot" style="'+Rs('tot')+'">수수료 총합<small>'+(showGift?'상품권 제외':'')+'</small></th>'
+     + (showGift? '<th class="R n h-tot2" style="'+Rs('tot2')+'">총합<small>상품권 포함</small></th>':'');
 
-  const polThs=showPols ? activePols.map(p=>{
-    const sc=polScope(p), ck=!!polChecked[p.id], need=copiedFrom&&!ck;
-    return `<th class="th-pol${need?' th-need':''}" data-pid="${p.id}">
-    <div class="th-tags">
-      <span class="scope ${sc}" onclick="cyclePolScope('${p.id}')" title="누르면 본사↔본부">${scopeLabel(sc)}</span>
-      ${copiedFrom?`<span class="chk${ck?' on':''}" onclick="polCheck('${p.id}')" title="${ck?'금액 확인함':'금액 확인 필요 — 누르면 확인 표시'}">${ck?'✓':'!'}</span>`:''}
-    </div>
-    ${p.num}<div style="font-size:9.5px;opacity:.6;margin-top:1px;">${p.name.slice(0,10)}</div>
-    <button class="rm-pol" onclick="removePol('${p.id}')">✕</button>
-  </th>`;}).join('') : '';
-
-  const gradeHdr=showPols
-    ? `<th rowspan="2" class="th-grade-hdr" style="background:var(--pri-w);color:var(--pri-d);min-width:72px;font-size:11px;font-weight:700">그레이드<br>단가</th>`
-    : '';
-
-  let tbody='';
-  let curSec=''; // 현재 섹션 추적 (그레이드 단가 구분용)
+  // 본문
+  let tb='', curSec='';
   ROWS.forEach((row,i)=>{
     if(row.sec!==null) curSec=row.sec;
-    const isSecTop=row.sec!==null;
-
-    // 섹션별 그레이드 단가 결정
-    // 인터넷 단독: 인터넷 단가(55%)만 / TV 단독·2ndTV: TV 단가(45%)만 / 번들: 합산
     let rowGrade=gradeU;
     if(gradeU>0){
       if(curSec.includes('인터넷')) rowGrade=gradeInU;
       else if(curSec.includes('TV 단독')||curSec.includes('2ndTV')) rowGrade=gradeTvU;
-      else rowGrade=gradeU;
     }
-
-    // 상품권 정책은 수수료 합계에서 제외 (c-gift 고정 컬럼으로 별도 표시)
-    const tot=activePols
-      .filter(p=>!p.name.includes('상품권'))
-      .reduce((s,p)=>s+getVal(p.id,i),0)+rowGrade;
-    let tr='<tr'+(isSecTop?' class="sec-top"':'')+'>';
-
-    if(secSpan[i]>0) tr+=`<td class="c-cat" rowspan="${secSpan[i]}" style="word-break:keep-all;line-height:1.5;left:0;width:80px;min-width:80px">${row.sec.replace(/\n/g,'<br>')}</td>`;
-    if(catSpan[i]>0) tr+=`<td class="c-cat" rowspan="${catSpan[i]}" style="font-weight:600;background:#E8EEF6!important;background-color:#E8EEF6!important;left:80px;width:72px;min-width:72px">${(row.cat||'').replace(/\n/g,'<br>')}</td>`;
-    if(tvSpan[i]>0){
-      tr+=`<td class="c-tv" rowspan="${tvSpan[i]}">${row.tv||''}</td>`;
-    } else if(row.tv===null){
+    const sum=act.filter(p=>!p.name.includes('상품권')).reduce((s,p)=>s+getVal(p.id,i),0)+rowGrade;
+    const gv=giftVals[i]||0;
+    let tr='<tr'+(row.sec!==null?' class="sec-top"':'')+'>';
+    if(secSpan[i]>0) tr+='<td class="L k-sec" rowspan="'+secSpan[i]+'" style="'+Ls('sec')+'"><div class="stk">'+esc(row.sec).replace(/\n/g,'<br>')+'</div></td>';
+    if(catSpan[i]>0) tr+='<td class="L k-cat" rowspan="'+catSpan[i]+'" style="'+Ls('cat')+'"><div class="stk">'+esc(row.cat||'').replace(/\n/g,'<br>')+'</div></td>';
+    if(tvSpan[i]>0) tr+='<td class="L k-tv" rowspan="'+tvSpan[i]+'" style="'+Ls('tv')+'"><div class="stk">'+esc(row.tv||'')+'</div></td>';
+    else if(row.tv===null){
       let covered=false;
-      for(let k=0;k<i;k++){if(tvSpan[k]>0&&k+tvSpan[k]>i){covered=true;break;}}
-      if(!covered) tr+=`<td class="c-tv"></td>`;
+      for(let k=0;k<i;k++){ if(tvSpan[k]>0&&k+tvSpan[k]>i){covered=true;break;} }
+      if(!covered) tr+='<td class="L k-tv" style="'+Ls('tv')+'"></td>';
     }
-    tr+=`<td class="c-in">${row.in||''}</td>`;
-
-    // 상품권 고정 컬럼 (수수료 합계 미포함, 항상 표시)
-    const gv=giftVals[i];
-    tr+=`<td class="c-gift" data-ri="${i}" onmousedown="giftMouseDown(event,this,${i})" onmouseover="giftMouseOver(this,${i})">${gv?gv.toLocaleString():''}</td>`;
-
+    tr+='<td class="L k-in'+eL('in')+'" style="'+Ls('in')+'">'+esc(row.in||'')+'</td>';
+    if(showGift) tr+='<td class="L c-gift edgeL" style="'+Ls('gift')+'" data-ri="'+i+'" onmousedown="giftMouseDown(event,this,'+i+')" onmouseover="giftMouseOver(this,'+i+')">'+(gv?gv.toLocaleString():'')+'</td>';
     if(showPols){
-      activePols.forEach(p=>{
-        const v=getVal(p.id,i);
-        const isNull=polVals[p.id]&&polVals[p.id][i]===null;
-        const isCustom=polVals[p.id]&&polVals[p.id][i]!==undefined&&polVals[p.id][i]!==null;
-        const pi=activePols.indexOf(p);
-        tr+=`<td class="c-pol${isNull?' null-val':''}" onclick="startEdit(this,'${p.id}',${i})" data-pi="${pi}" data-ri="${i}" title="${isCustom?'직접 입력':'기본값'}">${v?v.toLocaleString():'-'}</td>`;
+      act.forEach((p,pi)=>{
+        const m=cellMeta(p.id,i);
+        tr+='<td class="'+m.cls+'" onclick="startEdit(this,\''+p.id+'\','+i+')" data-pi="'+pi+'" data-ri="'+i+'" title="'+esc(m.title)+'">'+m.txt+'</td>';
       });
-      tr+=`<td class="c-grade">${rowGrade?rowGrade.toLocaleString():'-'}</td>`;
+      if(!ro) tr+='<td></td>';
     }
-
-    const totEx=Math.floor(tot/100)*100;
-    const totInc=Math.floor((tot+(gv||0))/100)*100;
-    tr+=`<td class="c-tot">${totEx.toLocaleString()}</td>`;
-    tr+=`<td class="c-tot-gift">${totInc.toLocaleString()}</td>`;
-    tr+='</tr>';
-    tbody+=tr;
+    const totEx=Math.floor(sum/100)*100, totInc=Math.floor((sum+gv)/100)*100;
+    tr+='<td class="R c-grade edgeR" style="'+Rs('grade')+'">'+(rowGrade?rowGrade.toLocaleString():'–')+'</td>'
+       + '<td class="R c-tot" style="'+Rs('tot')+'">'+totEx.toLocaleString()+'</td>'
+       + (showGift? '<td class="R c-tot-gift" style="'+Rs('tot2')+'">'+totInc.toLocaleString()+'</td>':'');
+    tb+=tr+'</tr>';
   });
 
-  // colgroup으로 각 컬럼 폭 고정 → sticky 찌그러짐 해결
-  const POL_W=90, GRADE_W=72, TOT_W=90, TOT2_W=90;
-  const fixedW=80+72+(hasTV?62:0)+(hasIn?58:0)+72+(showPols?(activePols.length*POL_W+GRADE_W):0)+TOT_W+TOT2_W;
-  let cg='<colgroup>';
-  cg+=`<col style="width:80px">`;
-  cg+=`<col style="width:72px">`;
-  if(hasTV)cg+=`<col style="width:62px">`;
-  if(hasIn)cg+=`<col style="width:58px">`;
-  cg+=`<col style="width:72px">`;
-  if(showPols){activePols.forEach(()=>{cg+=`<col style="width:${POL_W}px">`;});cg+=`<col style="width:${GRADE_W}px">`;}
-  cg+=`<col style="width:${TOT_W}px">`;
-  cg+=`<col style="width:${TOT2_W}px">`;
-  cg+='</colgroup>';
-  document.getElementById('tbl-wrap').innerHTML=`
-  <table style="${showPols?'width:max-content;min-width:100%':'width:auto'}">
-    ${cg}
-    <thead>
-      <tr>
-        <th class="th-sec" rowspan="2" style="position:sticky;left:0;z-index:12;width:80px;min-width:80px;max-width:80px">대분류</th>
-        <th class="th-sec" rowspan="2" style="position:sticky;left:80px;z-index:12;width:72px;min-width:72px;max-width:72px">구분</th>
-        ${hasTV?'<th class="th-sec" rowspan="2" style="position:sticky;left:152px;z-index:12;width:62px;min-width:62px;max-width:62px">TV</th>':''}
-        ${hasIn?'<th class="th-sec" rowspan="2" style="position:sticky;left:214px;z-index:12;width:58px;min-width:58px;max-width:58px">인터넷</th>':''}
-        <th class="th-sec" rowspan="2" style="position:sticky;left:272px;z-index:12;width:72px;min-width:72px;max-width:72px;box-shadow:3px 0 8px -2px rgba(0,0,0,.1)">상품권<div style="font-size:9px;opacity:.55;margin-top:1px;">합산제외</div></th>
-        ${polThs}
-        ${gradeHdr}
-        <th rowspan="2" style="background:var(--pri-w2);color:#23407a;font-size:11px;font-weight:700;width:90px;min-width:90px;border-left:2px solid var(--pri)">수수료<br>총합<div style="font-size:8.5px;font-weight:500;opacity:.65;margin-top:2px;line-height:1.2">상품권 제외</div></th>
-        <th rowspan="2" style="background:#eef3fb;color:#2b5797;font-size:11px;font-weight:700;width:90px;min-width:90px;border-left:1px solid var(--line)">수수료<br>총합<div style="font-size:8.5px;font-weight:500;opacity:.65;margin-top:2px;line-height:1.2">상품권 포함</div></th>
-      </tr>
-      <tr></tr>
-    </thead>
-    <tbody>${tbody}</tbody>
-  </table>`;
+  document.getElementById('tbl-wrap').innerHTML='<table class="ft"><thead><tr>'+th+'</tr></thead><tbody>'+tb+'</tbody></table>';
+
+  const lg=document.getElementById('ft-legend');
+  if(lg) lg.innerHTML=(ro? '<span>읽기 전용 — 로그인하면 칸을 눌러 금액을 고칠 수 있습니다</span>'
+                         : '<span>칸을 누르면 금액 수정 · 끌어서 여러 칸 선택 후 Enter · 비우면 0원</span>')
+    + (_prevSt? '<span><i class="lg-chg"></i>'+ymLabel(_prevSt.ym)+'과 금액이 다른 칸</span><span><i class="lg-new"></i>'+ymLabel(_prevSt.ym)+'에 없던 정책</span>':'');
+
+  if(editingPol){
+    const ni=document.getElementById('pe-num');
+    if(ni){
+      setTimeout(()=>{ (ni.value? document.getElementById('pe-name'):ni).focus(); },0);
+      const keys=e=>{ if(e.key==='Enter'){ e.preventDefault(); commitPolEdit(); } if(e.key==='Escape'){ e.preventDefault(); cancelPolEdit(); } };
+      ni.onkeydown=keys; document.getElementById('pe-name').onkeydown=keys;
+    }
+  }
+}
+
+/* ── 정책 열 추가 · 이름 고치기 (머리에서 바로) ─────────────── */
+function addPolColumn(){
+  if(!requireEdit()) return;
+  if(colsCollapsed){ colsCollapsed=false; }
+  const id='P_'+Date.now().toString(36);
+  policies.push({id,num:'',name:'',apply:true});
+  editingPol=id; newPolId=id;
+  renderTable();
+  const w=document.getElementById('tbl-wrap'); if(w) w.scrollLeft=w.scrollWidth;
+}
+function editPolHead(id){
+  if(!canEdit()) return;
+  if(editingPol && editingPol!==id) commitPolEdit();
+  editingPol=id; newPolId=null; renderTable();
+}
+function cancelPolEdit(){
+  if(editingPol && editingPol===newPolId) policies=policies.filter(p=>p.id!==newPolId);
+  editingPol=null; newPolId=null; renderTable();
+}
+function commitPolEdit(){
+  const id=editingPol; if(!id) return;
+  const ni=document.getElementById('pe-num'), na=document.getElementById('pe-name');
+  const num=(ni&&ni.value||'').trim(), name=(na&&na.value||'').trim();
+  const p=policies.find(x=>x.id===id);
+  if(!p){ editingPol=null; return; }
+  if(!num && !name){ return cancelPolEdit(); }
+  if(policies.find(x=>x.id!==id && x.num===(num||name) && x.name===name)){
+    alert('같은 정책번호·정책명이 이미 있습니다.'); return;
+  }
+  p.num=num||name; p.name=name;
+  if(id===newPolId && copiedFrom) polChecked[id]=true;   // 직접 만든 정책은 확인할 필요가 없다
+  editingPol=null; newPolId=null;
+  saveAll(); renderTable();
 }
 
 // ══════ 편집 권한 ══════
@@ -2013,18 +2067,14 @@ function startEdit(td,polId,ri){
     if(v==='') polVals[polId][ri]=null;        // 빈칸 = 명시적 0 (기본값 복원 안 함)
     else polVals[polId][ri]=parseFloat(v)||0;
     td.classList.remove('editing');
-    const fv=getVal(polId,ri);
-    const isNull=polVals[polId][ri]===null;
-    td.className='c-pol'+(isNull?' null-val':'');
-    td.setAttribute('onclick','startEdit(this,\''+polId+'\','+ri+')');
-    td.textContent=fv?fv.toLocaleString():'-';
+    applyCellView(td,polId,ri);
     updateRowTotal(td);
     saveAll();
   }
   inp.addEventListener('blur',commit);
   inp.addEventListener('keydown',e=>{
     if(e.key==='Enter') inp.blur();
-    if(e.key==='Escape'){td.classList.remove('editing');const fv=getVal(polId,ri);td.textContent=fv?fv.toLocaleString():'-';}
+    if(e.key==='Escape'){ inp.removeEventListener('blur',commit); applyCellView(td,polId,ri); }
     if(e.key==='Tab'){e.preventDefault();const tds=[...td.closest('tbody').querySelectorAll('.c-pol')];const idx=tds.indexOf(td);if(idx>=0&&idx<tds.length-1){inp.blur();setTimeout(()=>tds[idx+1].click(),10);}}
   });
 }
@@ -2138,7 +2188,8 @@ function editGift(td, ri){
     if(e.key==='Escape'){td.classList.remove('editing');td.textContent=giftVals[ri]?giftVals[ri].toLocaleString():'';}
   });
 }
-function addPol(){
+function addPol(){ return addPolColumn(); }
+function addPolOld(){
   const num=document.getElementById('np-num').value.trim();
   const name=document.getElementById('np-name').value.trim();
   if(!num||!name){alert('정책구분과 정책명은 필수입니다.');return;}
@@ -2153,35 +2204,163 @@ function addPol(){
   saveAll(); renderTable();
 }
 function removePol(id){
-  if(!confirm('"'+id+'" 정책을 삭제하시겠습니까? 입력된 금액도 삭제됩니다.'))return;
+  if(!requireEdit()) return;
+  const p=policies.find(x=>x.id===id)||{};
+  if(!confirm('"'+(p.num||id)+(p.name?' · '+p.name:'')+'" 정책 열을 지울까요? 이 달에 입력된 금액도 함께 지워집니다.'))return;
   policies=policies.filter(p=>p.id!==id);
-  delete polVals[id];
+  delete polVals[id]; delete polChecked[id];
+  editingPol=null; newPolId=null;
   saveAll(); renderTable();
 }
 
-// ══════ 그레이드 매트릭스 ══════
+// ══════ 그레이드 매트릭스 (v19) ══════
+//  · 이전 표는 팝업이 아니라 이 자리에서 바꿔 본다 (계산에는 영향 없음)
+//  · 전월에 쓰던 표와 다른 칸을 색으로 표시한다 (오른 칸 초록 · 내린 칸 빨강)
+let mxViewId=null, mxShowRev=false, hlIN=null, hlTV=null;
+function viewedMatrix(){ return (mxViewId!=null && SKY.matrices.find(m=>m.id===mxViewId)) || SKY.activeMx; }
+function mxMap(m){
+  if(!m) return {};
+  if(!_mxCache[m.id]){
+    const t={}, d=m.data||{};
+    [[d.R8A,d.C8A],[d.R8B,d.C8B],[d.R2K,d.C2K]].forEach(([rs,cs])=>{
+      if(!rs||!cs) return;
+      rs.forEach(([a,vs])=>vs&&vs.forEach((v,i)=>{ if(v!=null&&cs[i]!=null) t[a+'_'+cs[i]]=v; }));
+    });
+    _mxCache[m.id]=t;
+  }
+  return _mxCache[m.id];
+}
+const mxPrevVersion=m=>{ const i=SKY.matrices.findIndex(x=>x.id===m.id); return i>0? SKY.matrices[i-1] : null; };
+function setMxView(id){ mxViewId=(SKY.activeMx&&id===SKY.activeMx.id)? null : id; mxShowRev=false; renderGrade(); }
+function setMxRev(v){ mxShowRev=!!v; renderGrade(); }
+function openGradeHistory(){ go('grade'); }
+
+/* 무엇과 비교해 색을 칠할지 */
+function mxBase(m){
+  if(!m) return {base:null, note:''};
+  if(mxViewId!=null){
+    const pv=mxPrevVersion(m);
+    return {base:pv, note: pv? esc(pv.label)+' 대비 바뀐 칸' : '가장 오래된 표입니다'};
+  }
+  const pm=shiftMonth(curMonthKey(),-1), pmx=pm? matrixForMonth(pm) : null;
+  if(pmx && pmx.id!==m.id) return {base:pmx, note:ymLabel(pm)+'과 다른 칸 (표 개정)'};
+  if(mxShowRev){
+    const pv=mxPrevVersion(m);
+    return {base:pv, note: pv? esc(m.label)+' 개정 때 바뀐 칸' : '가장 오래된 표입니다', rev:true};
+  }
+  return {base:null, same:true, note: pm? ymLabel(pm)+'과 같은 표 · 바뀐 칸 없음' : ''};
+}
+
 function renderGrade(){
-  let h='<thead><tr><th class="mx-corner">인터넷＼TV</th>';
-  h+=TV_ALL.map(t=>`<th class="mx-th-col${selTV===t?' hi':''}" onclick="pickTV(${t})">${t}</th>`).join('');
-  h+='</tr></thead><tbody>';
+  const m=viewedMatrix();
+  const old=!!(m && SKY.activeMx && m.id!==SKY.activeMx.id);
+  const T=mxMap(m), B0=mxBase(m), B=B0.base? mxMap(B0.base) : null;
+
+  // 표 버전 고르기 + 범례
+  const gv=document.getElementById('gv');
+  if(gv){
+    const list=[...SKY.matrices].reverse();
+    gv.innerHTML='<span class="lbl">그레이드 표</span>'
+      + list.map(x=>'<button class="'+(m&&x.id===m.id?'on':'')+'" onclick="setMxView('+x.id+')">'+esc(x.label)
+          + (SKY.activeMx&&x.id===SKY.activeMx.id? ' <small>'+ymLabel(curMonthKey()).replace(/^\d+년 /,'')+' 적용</small>':'')+'</button>').join('')
+      + '<span class="gv-leg">'
+      + (B? '<span><i class="u"></i>오른 칸</span><span><i class="d"></i>내린 칸</span><span>'+B0.note+'</span>'
+          : '<span>'+B0.note+'</span>')
+      + ((B0.same||B0.rev)&&mxPrevVersion(m)? '<label class="sw" style="margin-left:4px"><input type="checkbox" '+(mxShowRev?'checked':'')+' onchange="setMxRev(this.checked)"><i></i>개정 때 바뀐 칸</label>':'')
+      + '</span>';
+  }
+  const ob=document.getElementById('gv-old');
+  if(ob) ob.innerHTML= old? '<div class="gv-old">지금 <b>'+esc(m.label)+'</b>을 보고 있습니다. 보기만 하는 화면이라 계산에는 영향이 없습니다.'
+      + '<button class="ghost sm" onclick="setMxView('+SKY.activeMx.id+')">'+ymLabel(curMonthKey())+' 표로 돌아가기</button></div>' : '';
+  const lbl=document.getElementById('mx-ver-label'); if(lbl&&SKY.activeMx) lbl.textContent=SKY.activeMx.label;
+
+  // 매트릭스
+  const rowOn=iv=>(!old&&selIN===iv)||hlIN===iv, colOn=tv=>(!old&&selTV===tv)||hlTV===tv;
+  let h='<thead><tr><th class="mx-corner">인터넷＼TV</th>'
+    + TV_ALL.map(t=>'<th class="mx-th-col'+(colOn(t)?' hi':'')+'" onclick="pickTV('+t+')">'+t+'</th>').join('')
+    + '</tr></thead><tbody>';
   IN_ALL.forEach(iv=>{
-    h+=`<tr><th class="mx-th-row${selIN===iv?' on':''}" onclick="pickIN(${iv})">${iv}</th>`;
+    h+='<tr><th class="mx-th-row'+(rowOn(iv)?' on':'')+'" onclick="pickIN('+iv+')">'+iv+'</th>';
     TV_ALL.forEach(tv=>{
-      const v=mxLookup(iv,tv);
-      const isSel=selIN===iv&&selTV===tv;
-      const isHi=(selIN===iv||selTV===tv)&&!isSel;
-      h+=`<td class="mx-cell${!v?' nil':''}${isSel?' sel':''}${isHi?' hi':''}" onclick="pickCell(${iv},${tv})" title="${v?'':'이 구간은 그레이드 단가가 없습니다 (0원)'}">${v?v.toLocaleString():'-'}</td>`;
+      const k=iv+'_'+tv, v=T[k]||null;
+      const isSel=!old&&selIN===iv&&selTV===tv;
+      let cls='mx-cell', title='';
+      if(!v){ cls+=' nil'; title='그레이드 단가가 없는 구간 (0원)'; }
+      if(B && v){
+        const b=B[k]||null;
+        if(b!==v){ cls+= (b==null||v>b)? ' up':' dn'; title=(b==null?'새로 생긴 칸':'이전 '+b.toLocaleString()+' → '+v.toLocaleString())+' (만원)'; }
+      }
+      if(!isSel && (rowOn(iv)||colOn(tv))) cls+=' hi';
+      if(isSel) cls+=' sel';
+      h+='<td class="'+cls+'" onclick="pickCell('+iv+','+tv+')" title="'+title+'">'+(v?v.toLocaleString():'-')+'</td>';
     });
     h+='</tr>';
   });
-  h+='</tbody>';
-  document.getElementById('mx-tbl').innerHTML=h;
-  // 그레이드 선택 시 차액표 자동 갱신
-  renderDiffTable(0,0);
+  const tbl=document.getElementById('mx-tbl'); if(tbl) tbl.innerHTML=h+'</tbody>';
+  const wrap=document.querySelector('#page-grade .matrix-wrap'); if(wrap) wrap.classList.toggle('mx-old',old);
+  renderGradeSide(T, old);
 }
+/* 머리 칸은 십자선 표시만 (목표는 칸을 눌러 정한다) */
+function pickIN(iv){ hlIN=(hlIN===iv?null:iv); renderGrade(); }
+function pickTV(tv){ hlTV=(hlTV===tv?null:tv); renderGrade(); }
 
-function pickIN(iv){selIN=(selIN===iv?null:iv);selTV=null;renderGrade();renderDiffTable(selIN||0,selTV||0);}
-function pickTV(tv){selTV=(selTV===tv?null:tv);selIN=null;renderGrade();renderDiffTable(selIN||0,selTV||0);}
+/* ── 오른쪽 : 지금 칸에서 한 단계 더 ─────────────────────── */
+function renderGradeSide(T, old){
+  const ds=document.getElementById('gradeDiffSection'); if(!ds) return;
+  const L=(a,b)=>T[a+'_'+b]||null;
+  let a=selIN, b=selTV, from='그레이드 목표';
+  if(!(a&&b)||old){ a=floorIN(goalIN)||300; b=floorTV(goalTV)||300; from=goalIN?'본부 목표':'기준 300×300'; }
+  const won=(x,y)=>(L(x,y)||0)*10000;
+  const cur=won(a,b);
+  const step=(na,nb)=>{
+    if(!na||!nb||!L(na,nb)) return null;
+    const d=won(na,nb)-cur, n=(na-a)+(nb-b);
+    return {na,nb,d,n,per:n?Math.round(d/n):null};
+  };
+  const sIN=step(IN_ALL.find(v=>v>a&&L(v,b)), b);
+  const sTV=step(a, TV_ALL.find(v=>v>b&&L(a,v)));
+  const sBo=step(IN_ALL.find(v=>v>a), TV_ALL.find(v=>v>b));
+
+  // 1:1 로 늘릴 때 (인터넷 = TV)
+  const both=IN_ALL.filter(n=>TV_ALL.includes(n));
+  const rows=[]; let prev=null;
+  both.forEach(n=>{
+    const man=L(n,n); if(!man) return;
+    const tw=man*10000, r={n, tw, unit:Math.round(tw*.55/n)+Math.round(tw*.45/n)};
+    if(prev){ r.d=tw-prev.tw; r.per=Math.round(r.d/(n-prev.n)); }
+    rows.push(r); prev=r;
+  });
+  const ms=rows.map(r=>r.per).filter(v=>v!=null).sort((x,y)=>x-y), med=ms.length? ms[Math.floor(ms.length/2)]:0;
+  const hot=v=>v!=null&&med>0&&v>=med*1.5;
+  const mark=Math.min(a,b);
+
+  const card=(label,s,unitLbl)=> !s
+    ? '<div class="none"><span>'+label+'</span><b>더 오를 구간 없음</b></div>'
+    : '<div class="'+(hot(s.per*2)?'hot':'')+'"><span>'+label+' <b style="font-size:12px;color:var(--text)">+'+fmtN(s.n)+'건</b></span>'
+      + '<b>+'+fmtN(Math.round(s.d/10000))+'만원</b><small>'+(unitLbl==='번들'?'번들 ':'')+'건당 '+fmtN(unitLbl==='번들'? s.per*2 : s.per)+'원</small></div>';
+
+  let h='<div class="card" style="margin:0">'
+    + '<div class="card-h"><h2><span class="ib c3">'+ICO.chart+'</span>한 단계 더 가면</h2></div>'
+    + '<p class="sub" style="margin:-4px 0 12px">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+fmtN(Math.round(cur/10000))+'만원</b></p>'
+    + '<div class="nx">'
+    +   card('인터넷만', sIN, '인터넷')
+    +   card('TV만', sTV, 'TV')
+    +   card('둘 다', sBo, '번들')
+    + '</div>'
+    + '<div class="tw" style="max-height:430px"><table class="t"><thead><tr>'
+    + '<th>인터넷 = TV</th><th class="n">지급총액</th><th class="n">번들 건당<br><small style="font-weight:400">평균</small></th>'
+    + '<th class="n">한계가치<br><small style="font-weight:400">번들 1건 더</small></th></tr></thead><tbody>'
+    + rows.map(r=>'<tr'+(r.n===mark?' class="flag"':'')+'><td'+(r.n===mark?' class="b"':'')+'>'+fmtN(r.n)+'건'+(r.n===mark?' <span class="badge blue">지금</span>':'')+'</td>'
+        + '<td class="n">'+fmtN(Math.round(r.tw/10000))+'만원</td><td class="n">'+fmtN(r.unit)+'</td>'
+        + '<td class="n'+(hot(r.per)?' badc':'')+'">'+(r.per==null?'<span class="dim">—</span>':fmtN(r.per))+'</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<div class="foot-note"><span>우리 목표는 인터넷과 TV가 1:1이라 <b>둘을 같이 늘릴 때</b>를 기준으로 줄 세웠습니다. '
+    + '<b>한계가치</b>는 그 구간을 넘길 때 늘어나는 총액을 늘어난 번들 수로 나눈 값입니다 — 번들 단가보다 크면 시장 최고가를 줘도 남습니다. '
+    + '<span class="bad">빨간 칸</span>은 평소의 1.5배를 넘는 구간입니다.</span></div></div>';
+  ds.innerHTML=h;
+}
+function renderDiffTable(){ renderGrade(); }
+
 /* v15.4: 저장된 그레이드 단가는 '계산된 값'이라 매트릭스가 개정되면 옛 단가가 남는다.
    → 저장/복원 시점마다 selIN·selTV로 현재 매트릭스에서 다시 계산한다. */
 function recalcGrade(){
@@ -2199,6 +2378,7 @@ function recalcGrade(){
 }
 
 function pickCell(iv,tv){
+  if(mxViewId!=null){ showToast('이전 표는 보기만 됩니다 — 목표는 이 달 표에서 고르세요'); return; }
   selIN=iv; selTV=tv;
   // 그레이드 단가가 없는 구간(표의 '-')도 고를 수 있다. 그 달 목표는 잡아야 하고,
   // 그레이드가 0원이면 0원인 채로 수수료표·회의자료에 반영되어야 한다.
@@ -3088,97 +3268,6 @@ const fmtN=n=>Math.round(n).toLocaleString('ko-KR');
 
 // ── 목표달성 계산 ──
 
-
-/* ════════════════════════════════════════════════════════════
-   단계별 그레이드 — 한 건 더 했을 때 실제로 얼마가 더 들어오나
-
-   표에 적힌 단가는 전체 건을 평균 낸 값이다. 하지만 "한 건 더
-   가져올까"를 판단할 때 필요한 건 평균이 아니라 한계가치
-   (그 구간을 넘길 때 늘어나는 총액 ÷ 늘어난 건수)다.
-   둘은 꽤 다르고, 구간에 따라 한계가치가 몇 배로 튄다.
-   ════════════════════════════════════════════════════════════ */
-let gsAxis='in';          // 'in' 인터넷 변동 / 'tv' TV 변동 / 'both' 함께
-function gsSetAxis(a){ gsAxis=a; renderDiffTable(selIN||0, selTV||0); }
-
-/* 고정축 값 : 본부 목표 → 그레이드 목표 → 300 순으로 집는다 */
-function gsFixed(){
-  if(gsAxis==='in') return floorTV(goalTV) || floorTV(selTV) || 300;
-  if(gsAxis==='tv') return floorIN(goalIN) || floorIN(selIN) || 300;
-  return null;
-}
-function gsTotal(n, fixed){
-  if(gsAxis==='in')  return mxLookup(n, fixed);
-  if(gsAxis==='tv')  return mxLookup(fixed, n);
-  return mxLookup(n, n);
-}
-function gsSteps(){
-  const fixed=gsFixed();
-  const list=(gsAxis==='tv')?TV_ALL:IN_ALL;
-  const mark=(gsAxis==='tv')? (floorTV(goalTV)||floorTV(selTV))
-                            : (floorIN(goalIN)||floorIN(selIN));
-  const rows=[]; let prev=null;
-  list.forEach(n=>{
-    const man=gsTotal(n,fixed); if(!man) return;
-    const total=man*10000;
-    const unit = gsAxis==='both' ? Math.round(total*0.55/n)+Math.round(total*0.45/n)
-               : gsAxis==='in'   ? Math.round(total*0.55/n)+Math.round(total*0.45/fixed)
-               :                   Math.round(total*0.55/fixed)+Math.round(total*0.45/n);
-    const r={n, total, unit,
-             dTotal: prev? total-prev.total : null,
-             dCnt  : prev? n-prev.n : null,
-             isGoal: n===mark};
-    r.marginal = (r.dTotal!=null && r.dCnt) ? Math.round(r.dTotal/r.dCnt) : null;
-    rows.push(r); prev=r;
-  });
-  // 한계가치가 평소보다 크게 튀는 구간을 찾는다 (중앙값의 1.5배 이상)
-  const ms=rows.map(r=>r.marginal).filter(v=>v!=null).sort((a,b)=>a-b);
-  const med=ms.length? ms[Math.floor(ms.length/2)] : 0;
-  rows.forEach(r=>{ r.hot = r.marginal!=null && med>0 && r.marginal >= med*1.5; });
-  return {fixed, rows, med, mark};
-}
-
-function renderDiffTable(gIN,gTV){
-  const ds=document.getElementById('gradeDiffSection'); if(!ds) return;
-  const AX=[['in','인터넷 변동'],['tv','TV 변동'],['both','함께 변동']];
-  const pills='<div class="pills sm">'+AX.map(([k,l])=>
-      '<button class="'+(gsAxis===k?'on':'')+'" onclick="gsSetAxis(\''+k+'\')">'+l+'</button>').join('')+'</div>';
-
-  const {fixed, rows, mark}=gsSteps();
-  if(!rows.length){
-    ds.innerHTML='<div class="card" style="margin:0"><div class="card-h"><h2>단계별 그레이드</h2>'+pills+'</div>'
-      +'<div class="none">그레이드 표에서 값을 찾지 못했습니다</div></div>';
-    return;
-  }
-  const fixTxt = gsAxis==='both' ? '인터넷 = TV 같은 건수'
-    : (gsAxis==='in' ? 'TV '+fmtN(fixed)+'건 고정' : '인터넷 '+fmtN(fixed)+'건 고정');
-  const colName = gsAxis==='tv' ? 'TV 건수' : (gsAxis==='both'?'건수':'인터넷 건수');
-
-  let h='<div class="card" style="margin:0">'
-    + '<div class="card-h"><h2>단계별 그레이드</h2>'+pills+'</div>'
-    + '<p class="sub" style="margin:0 0 12px">'+fixTxt
-    + (mark? ' · 기준 <b>'+fmtN(mark)+'건</b>':'')+'</p>'
-    + '<div class="tw" style="max-height:520px"><table class="t"><thead><tr>'
-    + '<th>'+colName+'</th><th class="n">지급총액</th><th class="n">건당단가<br><small style="font-weight:400">평균</small></th>'
-    + '<th class="n">총액차액</th><th class="n">한계가치<br><small style="font-weight:400">원/건</small></th>'
-    + '</tr></thead><tbody>';
-  rows.forEach(r=>{
-    h+='<tr'+(r.isGoal?' class="flag"':'')+'>'
-     + '<td class="'+(r.isGoal?'b':'')+'">'+fmtN(r.n)+'건'+(r.isGoal?' <span class="badge blue">기준</span>':'')+'</td>'
-     + '<td class="n">'+fmtN(Math.round(r.total/10000))+'만원</td>'
-     + '<td class="n">'+fmtN(r.unit)+'</td>'
-     + '<td class="n">'+(r.dTotal==null?'<span class="dim">—</span>'
-         :'<span class="cp">+'+fmtN(Math.round(r.dTotal/10000))+'만원</span>')+'</td>'
-     + '<td class="n'+(r.hot?' badc':'')+'">'+(r.marginal==null?'<span class="dim">—</span>'
-         :(r.hot?'<b>':'')+fmtN(r.marginal)+(r.hot?'</b>':''))+'</td>'
-     + '</tr>';
-  });
-  h+='</tbody></table></div>'
-   + '<div class="foot-note"><span><b>한계가치</b>는 그 구간을 넘길 때 늘어나는 총액을 늘어난 건수로 나눈 값입니다. '
-   + '한 건 더 가져올지 판단할 때는 평균단가가 아니라 이 값을 보세요. '
-   + '<span class="bad">빨간 칸</span>은 한계가치가 평소의 1.5배를 넘는 구간 — 여기서는 시장 최고가를 줘도 남습니다.</span></div>'
-   + '</div>';
-  ds.innerHTML=h;
-}
 
 let ROWS=JSON.parse(JSON.stringify(BASE_ROWS));
 let DEF=JSON.parse(JSON.stringify(BASE_DEF));
