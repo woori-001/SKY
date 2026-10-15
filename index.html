@@ -1296,8 +1296,11 @@ async function sbLoadMonth(ym){
 }
 
 let _saveTimer=null, _savingNow=false, _saveAgain=false;
+let _dirtyGen=0, _savedGen=0;   // 고친 횟수 / 서버에 올라간 횟수 — 다르면 아직 안 올라간 수정이 있다
+function hasUnsaved(){ return _dirtyGen!==_savedGen || !!_cmpSaveTimer; }
 function autoSave(){
   if(!canEdit()) return;
+  _dirtyGen++;
   clearTimeout(_saveTimer);
   setSyncDot('saving','저장 중...');
   _saveTimer=setTimeout(()=>{ sbSaveMonth(); }, 1200);
@@ -1309,6 +1312,7 @@ async function sbSaveMonth(){
   if(!ym) return false;
   if(_savingNow){ _saveAgain=true; return false; }
   _savingNow=true;
+  const gen=_dirtyGen;
   try{
     setSyncDot('saving','저장 중...');
     const row={
@@ -1333,6 +1337,7 @@ async function sbSaveMonth(){
     const {error}=await sb.from('sky_months').upsert(row,{onConflict:'month'});
     if(error) throw error;
     monthCache[ym]=row;
+    _savedGen=gen;
     setSyncDot('ok','마지막 저장 '+new Date().toLocaleTimeString('ko-KR'));
     showSaved();
     return true;
@@ -1345,6 +1350,18 @@ async function sbSaveMonth(){
     _savingNow=false;
     if(_saveAgain){ _saveAgain=false; setTimeout(()=>sbSaveMonth(),300); }
   }
+}
+
+/* 월 전환·다시 불러오기 직전에 부른다. 저장 대기 중인 값을 먼저 서버에 올린다.
+   (예전엔 1.2초 대기 중에 다시 불러오기가 끼어들면, 방금 고친 값이 서버의 옛 값으로
+   바뀐 채 저장되어 '입력한 게 사라지는' 일이 생겼다) */
+async function flushSaves(){
+  if(!canEdit()) return true;
+  if(_cmpSaveTimer){ clearTimeout(_cmpSaveTimer); _cmpSaveTimer=null; await sbSaveCompareNow(); }
+  clearTimeout(_saveTimer);
+  for(let i=0;i<50 && _savingNow;i++) await new Promise(r=>setTimeout(r,100));
+  if(_dirtyGen!==_savedGen) return await sbSaveMonth();
+  return true;
 }
 
 function _eqJSON(a,b){ try{return JSON.stringify(a)===JSON.stringify(b);}catch(e){return false;} }
@@ -1400,12 +1417,14 @@ async function sbDeleteCompareSource(id){
   SKY.cmpSrc=SKY.cmpSrc.filter(s=>s.id!==id); delete SKY.cmpVals[id];
   return true;
 }
-let _cmpSaveTimer=null;
+let _cmpSaveTimer=null;  // (hasUnsaved 에서도 본다)
 function saveCompareValsDebounced(){
   if(!canEdit()) return;
   clearTimeout(_cmpSaveTimer);
   setSyncDot('saving','저장 중...');
-  _cmpSaveTimer=setTimeout(async()=>{
+  _cmpSaveTimer=setTimeout(()=>{ _cmpSaveTimer=null; sbSaveCompareNow(); }, 1200);
+}
+async function sbSaveCompareNow(){
     const ym=curMonthKey(); if(!sb||!ym) return;
     const rows=SKY.cmpSrc.map(s=>({source_id:s.id, month:ym, vals:SKY.cmpVals[s.id]||{},
                                    updated_by:(sbUser&&sbUser.email)||''}));
@@ -1413,15 +1432,24 @@ function saveCompareValsDebounced(){
     const {error}=await sb.from('sky_compare_values').upsert(rows,{onConflict:'source_id,month'});
     if(error){ setSyncDot('error','저장 실패'); showGsStatus('⚠ 저장 실패',false); }
     else { setSyncDot('ok','마지막 저장 '+new Date().toLocaleTimeString('ko-KR')); showSaved(); }
-  }, 1200);
 }
 
 /* ── 전체 새로고침 (점 클릭 / 탭 복귀) ───────────────────── */
 let _reloading=false;
 async function sbRefreshAll(){
   if(_reloading||!sb) return false;
+  // 셀을 고치는 중이거나 상품 편집 중이면 화면을 갈아엎지 않는다
+  const ae=document.activeElement;
+  if(_feeEditMode || (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))){
+    setSyncDot(canEdit()?'ok':'readonly','입력 중이라 다시 불러오기를 미뤘습니다');
+    return false;
+  }
   _reloading=true;
   try{
+    if(!(await flushSaves())){
+      setSyncDot('error','저장되지 않은 수정이 있어 다시 불러오지 않았습니다');
+      return false;
+    }
     setSyncDot('saving','불러오는 중...');
     // v16: 캐시를 비워야 다른 PC에서 고친 내용이 실제로 올라온다.
     //      (안 비우면 loadMonthInto 가 옛 캐시를 그대로 써서 새로고침이 무의미했다)
@@ -1670,8 +1698,10 @@ function getVal(polId, ri){
     const v=polVals[polId][ri];
     return v===null?0:(parseFloat(v)||0);
   }
-  // IN-05/IN-08 그레이드
-  const tgt=selIN||850;
+  // IN-05/IN-08 : 그레이드 목표 건수에 따라 건당 금액이 달라지는 정책.
+  // 목표를 안 잡은 달은 예전엔 850건으로 가정해 엉뚱한 금액이 나왔다 → 표의 기본값을 쓴다.
+  const tgt=selIN;
+  if(!tgt) return (DEF[ri]&&DEF[ri][polId])||0;
   if(polId==='IN-05'){const u=tgt>=200?20000:tgt>=100?10000:tgt>=50?5000:0;return Math.round(Math.min(u*tgt,4000000)/tgt);}
   if(polId==='IN-08'){const u=tgt>=150?20000:tgt>=100?15000:tgt>=50?10000:0;return Math.round(Math.min(u*tgt,12000000)/tgt);}
   return (DEF[ri]&&DEF[ri][polId])||0;
@@ -2602,7 +2632,10 @@ async function setMonth(){
   const mi=document.getElementById('month-in');
   const newV=mi&&mi.value; if(!newV)return;
   // 넘어가기 전에 지금 달 저장을 확정
-  if(canEdit()){ clearTimeout(_saveTimer); await sbSaveMonth(); }
+  if(canEdit() && !(await flushSaves())){
+    alert('지금 달 저장에 실패해서 달을 바꾸지 않았습니다. 연결 상태를 확인하고 다시 시도하세요.');
+    renderCal(); return;
+  }
 
   const[y,mm]=newV.split('-');
   curMonth=y+'년 '+parseInt(mm)+'월';
@@ -2724,6 +2757,9 @@ document.addEventListener('visibilitychange',()=>{
   if(Date.now()-_lastRefresh < 60000) return;
   _lastRefresh=Date.now();
   sbRefreshAll();
+});
+window.addEventListener('beforeunload',e=>{
+  if(canEdit() && hasUnsaved()){ e.preventDefault(); e.returnValue=''; }
 });
 window.addEventListener('online',()=>{ _lastRefresh=Date.now(); sbRefreshAll(); });
 
@@ -2885,6 +2921,7 @@ function saveMonthRows(ym){ autoSave(); }
 let _feeEditMode=false;
 
 function toggleFeeEdit(){
+  if(!_feeEditMode && !requireEdit()) return;
   _feeEditMode=!_feeEditMode;
   renderTable();
   const btn=document.getElementById('fee-edit-btn');
@@ -2905,6 +2942,7 @@ function toggleFeeEdit(){
 }
 
 function saveFeeChanges(){
+  if(!requireEdit()) return;
   if(_editGroups) groupsToRows(_editGroups);
   _editGroups=null;
   const ym=curMonthKey();
@@ -2921,7 +2959,9 @@ function saveFeeChanges(){
 }
 
 function resetFeeToBase(){
-  if(!confirm('기본값으로 복원할까요? 현재 월 편집 내용이 사라져요.'))return;
+  if(!requireEdit()) return;
+  if(!confirm('상품 행 구성을 기본 44행으로 되돌릴까요?\n행을 추가·삭제했던 달이라면 입력한 금액이 다른 행에 붙을 수 있습니다.'))return;
+  _editGroups=null;
   ROWS=JSON.parse(JSON.stringify(BASE_ROWS));
   DEF=JSON.parse(JSON.stringify(BASE_DEF));
   _feeEditMode=false;
@@ -2956,25 +2996,51 @@ function rowsToGroups(){
       cur={sec:r.sec||'',cat:r.cat||'',items:[]};
       groups.push(cur);
     }
-    if(cur) cur.items.push({tv:r.tv||'',in:r.in||'',fee:Object.values(DEF[i]||{})[0]||0,_origIdx:i});
+    if(cur) cur.items.push({tv:r.tv||'',in:r.in||'',_origIdx:i});
   });
   return groups;
 }
 // 그룹 → ROWS+DEF 변환
+/* 상품 행을 옮기거나 지우면 행 번호가 바뀐다.
+   정책 금액·상품권·상부 비교값은 행 번호를 키로 저장되므로, 옛 번호 → 새 번호로
+   함께 옮겨야 금액이 다른 상품에 붙지 않는다. (예전엔 DEF 를 'IN-01' 하나로
+   덮어써서 행마다 들어 있던 정책별 기본금액이 전부 사라졌다) */
 function groupsToRows(groups){
-  const newRows=[],newDef={};
+  const newRows=[], newDef={}, map={};   // map[옛번호]=새번호
   let idx=0;
   groups.forEach(g=>{
     g.items.forEach((item,ii)=>{
       newRows.push({sec:ii===0?g.sec||null:null, cat:ii===0?g.cat||null:null, tv:item.tv||null, in:item.in||null});
-      newDef[idx]={'IN-01':item.fee||0};
+      if(item._origIdx!=null){
+        map[item._origIdx]=idx;
+        if(DEF[item._origIdx]) newDef[idx]=JSON.parse(JSON.stringify(DEF[item._origIdx]));
+      }
       idx++;
     });
   });
+  const remap=obj=>{
+    const out={};
+    Object.keys(obj||{}).forEach(k=>{ const n=map[k]; if(n!=null) out[n]=obj[k]; });
+    return out;
+  };
+  Object.keys(polVals).forEach(pid=>{ polVals[pid]=remap(polVals[pid]); });
+  giftVals=remap(giftVals);
+  let cmpChanged=false;
+  Object.keys(SKY.cmpVals||{}).forEach(sid=>{
+    const before=JSON.stringify(SKY.cmpVals[sid]);
+    SKY.cmpVals[sid]=remap(SKY.cmpVals[sid]);
+    if(JSON.stringify(SKY.cmpVals[sid])!==before) cmpChanged=true;
+  });
   ROWS=newRows; DEF=newDef;
+  if(cmpChanged) saveCompareValsDebounced();
 }
 
 let _editGroups=null;
+function feeEditTotal(ri){
+  const t=policies.filter(p=>p.apply&&!String(p.name||'').includes('상품권'))
+                  .reduce((a,p)=>a+getVal(p.id,ri),0);
+  return t?t.toLocaleString()+'원':'—';
+}
 
 function renderFeeEditView(){
   const wrap=document.getElementById('tbl-wrap');
@@ -3014,7 +3080,7 @@ function renderFeeEditView(){
         <thead><tr style="background:#F8FAFC;text-align:center">
           <th style="padding:5px 8px;border-bottom:1px solid #E2E8F0;text-align:left;color:var(--t3);font-size:10px">TV 상품</th>
           <th style="padding:5px 8px;border-bottom:1px solid #E2E8F0;color:var(--t3);font-size:10px">인터넷</th>
-          <th style="padding:5px 8px;border-bottom:1px solid #E2E8F0;color:var(--t3);font-size:10px">대표수수료(원)</th>
+          <th style="padding:5px 8px;border-bottom:1px solid #E2E8F0;color:var(--t3);font-size:10px">현재 수수료 합계</th>
           <th style="padding:5px 4px;border-bottom:1px solid #E2E8F0;width:80px;color:var(--t3);font-size:10px">순서/삭제</th>
         </tr></thead>
         <tbody>`;
@@ -3030,9 +3096,8 @@ function renderFeeEditView(){
           <input type="text" value="${item.in||''}" onchange="_editGroups[${gi}].items[${ii}].in=this.value"
             style="width:100%;padding:3px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:12px" placeholder="없으면 빈칸">
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #F1F5F9;text-align:center">
-          <input type="number" value="${item.fee||0}" onchange="_editGroups[${gi}].items[${ii}].fee=parseInt(this.value)||0"
-            style="width:90px;padding:3px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:12px;text-align:right;font-family:var(--num-font)">
+        <td style="padding:5px 8px;border-bottom:1px solid #F1F5F9;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:var(--t2)">
+          ${item._origIdx!=null?feeEditTotal(item._origIdx):'<span style="color:var(--t3);font-size:11px">새 행 · 금액은 수수료표에서</span>'}
         </td>
         <td style="padding:5px 4px;border-bottom:1px solid #F1F5F9;text-align:center">
           ${ii>0?`<button onclick="feeItemUp(${gi},${ii})" style="background:none;border:1px solid #E2E8F0;border-radius:3px;padding:1px 5px;cursor:pointer;font-size:12px">↑</button>`:'<span style="opacity:.2">↑</span>'}
@@ -3051,11 +3116,11 @@ function renderFeeEditView(){
 // 그룹 조작
 function feeAddGroup(){
   if(!_editGroups)_editGroups=rowsToGroups();
-  _editGroups.push({sec:'',cat:'',items:[{tv:'',in:'',fee:0}]});
+  _editGroups.push({sec:'',cat:'',items:[{tv:'',in:''}]});
   renderFeeEditView();
 }
 function feeDelGroup(gi){
-  if(!confirm('이 그룹 전체를 삭제할까요?'))return;
+  if(!confirm('이 그룹 전체를 삭제할까요? 이 달에 입력해 둔 금액도 함께 지워집니다.'))return;
   _editGroups.splice(gi,1);
   renderFeeEditView();
 }
@@ -3071,10 +3136,12 @@ function feeGroupDown(gi){
 }
 // 행 조작
 function feeAddItem(gi){
-  _editGroups[gi].items.push({tv:'',in:'',fee:0});
+  _editGroups[gi].items.push({tv:'',in:''});
   renderFeeEditView();
 }
 function feeDelItem(gi,ii){
+  const it=_editGroups[gi].items[ii];
+  if(it._origIdx!=null && !confirm('이 행을 지우면 이 달에 입력해 둔 금액도 함께 지워집니다. 계속할까요?')) return;
   _editGroups[gi].items.splice(ii,1);
   renderFeeEditView();
 }
@@ -3102,9 +3169,9 @@ function exportFeeTableToExcel(){
   const hRow2=['','','',''];
   const hRow3=['','','',''];
   activePols.forEach(p=>{hRow1.push(p.id||'');hRow2.push(p.num||'');hRow3.push(p.name||'');});
-  hRow1.push('그레이드단가','합계단가');
-  hRow2.push('','');
-  hRow3.push('','');
+  hRow1.push('그레이드단가','상품권','합계(상품권 제외)','합계(상품권 포함)');
+  hRow2.push('','','','');
+  hRow3.push('','','','');
   const wsData=[hRow1,hRow2,hRow3];
 
   // rowGrade 계산 로직 (renderTable과 동일)
@@ -3131,8 +3198,11 @@ function exportFeeTableToExcel(){
       row.push(fee||'');
       if(!p.name||!p.name.includes('상품권')) tot+=fee;
     });
+    const gift=giftVals[i]||0;
     row.push(rGrade||'');
-    row.push((tot+rGrade)||'');
+    row.push(gift||'');
+    row.push(Math.floor((tot+rGrade)/100)*100||'');
+    row.push(Math.floor((tot+rGrade+gift)/100)*100||'');
     wsData.push(row);
   });
 
@@ -3147,7 +3217,7 @@ function exportFeeTableToExcel(){
 
   ws['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8}];
   activePols.forEach(()=>ws['!cols'].push({wch:11}));
-  ws['!cols'].push({wch:11},{wch:11});
+  ws['!cols'].push({wch:11},{wch:10},{wch:14},{wch:14});
 
   const wb=XLSX.utils.book_new();
   const mth=(curMonthKey()||'').replace('-','')||'수수료표';
@@ -3278,7 +3348,8 @@ function renderCompare(){
   });
 
   const groups = CMP_GROUPS.map(g=>{
-    const rows = allRows.filter(r=>r.sec===g.secKey && r.cat===g.catKey && r.in);
+    const ns=x=>String(x||'').replace(/\s+/g,'');
+    const rows = allRows.filter(r=>ns(r.sec)===ns(g.secKey) && ns(r.cat)===ns(g.catKey) && r.in);
     return {...g, rows};
   }).filter(g=>g.rows.length);
 
