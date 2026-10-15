@@ -1826,12 +1826,7 @@ function valOf(st, polId, ri){
     const v=pv[polId][ri];
     return v===null?0:(parseFloat(v)||0);
   }
-  // IN-05/IN-08 : 그레이드 목표 건수에 따라 건당 금액이 달라지는 정책.
-  // 목표를 안 잡은 달은 예전엔 850건으로 가정해 엉뚱한 금액이 나왔다 → 표의 기본값을 쓴다.
-  const tgt=st.selIN;
-  if(!tgt) return (DEF[ri]&&DEF[ri][polId])||0;
-  if(polId==='IN-05'){const u=tgt>=200?20000:tgt>=100?10000:tgt>=50?5000:0;return Math.round(Math.min(u*tgt,4000000)/tgt);}
-  if(polId==='IN-08'){const u=tgt>=150?20000:tgt>=100?15000:tgt>=50?10000:0;return Math.round(Math.min(u*tgt,12000000)/tgt);}
+  // (예전엔 IN-05/IN-08 만 그레이드 목표 건수로 금액을 자동 계산했다 — 실제 정책이 아니라 없앴다)
   return (DEF[ri]&&DEF[ri][polId])||0;
 }
 
