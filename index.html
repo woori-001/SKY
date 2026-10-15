@@ -396,7 +396,7 @@ body:not(.readonly) .ph:hover .pn{color:var(--pri-d)}
 .mx-cell.hi{background:#f5f8ff}
 .mx-cell.up{background:#ecf8f2;color:#17805a;font-weight:600}
 .mx-cell.dn{background:#fdeeee;color:#c93a3f;font-weight:600}
-.mx-cell.sel{background:var(--pri)!important;color:#fff!important;font-weight:700;border-radius:8px;box-shadow:0 4px 10px -4px rgba(76,130,247,.6)}
+.mx-cell.sel{background:var(--pri)!important;color:#fff!important;font-weight:700;border-radius:0;box-shadow:none}
 .mx-cell.nil{color:#d3d8e0}
 .mx-cell.nil:hover{background:var(--soft)}
 .mx-old .mx-cell,.mx-old .mx-th-col,.mx-old .mx-th-row{cursor:default}
@@ -749,6 +749,7 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 .nx span{white-space:nowrap}
 body.readonly #copy-bar{display:none!important}
 body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
+.mp-m.has::after,.mp-m.on.has::after{display:none!important}
 /* ── 인쇄 ─────────────────────────────────────────────── */
 @media print{
   .sb,.top-r,.add-bar,.gb-sel,.rm-pol,#ro-banner{display:none!important}
@@ -2330,33 +2331,27 @@ function renderGradeSide(T, old){
     if(prev){ r.d=tw-prev.tw; r.per=Math.round(r.d/(n-prev.n)); }
     rows.push(r); prev=r;
   });
-  const ms=rows.map(r=>r.per).filter(v=>v!=null).sort((x,y)=>x-y), med=ms.length? ms[Math.floor(ms.length/2)]:0;
-  const hot=v=>v!=null&&med>0&&v>=med*1.5;
   const mark=Math.min(a,b);
 
-  const card=(label,s,unitLbl)=> !s
+  const card=(label,s)=> !s
     ? '<div class="none"><span>'+label+'</span><b>더 오를 구간 없음</b></div>'
-    : '<div class="'+(hot(s.per*2)?'hot':'')+'"><span>'+label+' <b style="font-size:12px;color:var(--text)">+'+fmtN(s.n)+'건</b></span>'
-      + '<b>+'+fmtN(Math.round(s.d/10000))+'만원</b><small>'+(unitLbl==='번들'?'번들 ':'')+'건당 '+fmtN(unitLbl==='번들'? s.per*2 : s.per)+'원</small></div>';
+    : '<div><span>'+label+' <b style="font-size:12px;color:var(--text)">+'+fmtN(s.n)+'건</b></span>'
+      + '<b class="cp">+'+fmtN(Math.round(s.d/10000))+'만원</b><small title="'+fmtN(s.na)+' × '+fmtN(s.nb)+'">총 '+fmtN(Math.round((cur+s.d)/10000))+'만원</small></div>';
 
   let h='<div class="card" style="margin:0">'
     + '<div class="card-h"><h2><span class="ib c3">'+ICO.chart+'</span>한 단계 더 가면</h2></div>'
     + '<p class="sub" style="margin:-4px 0 12px">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+fmtN(Math.round(cur/10000))+'만원</b></p>'
-    + '<div class="nx">'
-    +   card('인터넷만', sIN, '인터넷')
-    +   card('TV만', sTV, 'TV')
-    +   card('둘 다', sBo, '번들')
-    + '</div>'
+    + '<div class="nx">'+card('인터넷만', sIN)+card('TV만', sTV)+card('둘 다', sBo)+'</div>'
     + '<div class="tw" style="max-height:430px"><table class="t"><thead><tr>'
-    + '<th>인터넷 = TV</th><th class="n">지급총액</th><th class="n">번들 건당<br><small style="font-weight:400">평균</small></th>'
-    + '<th class="n">한계가치<br><small style="font-weight:400">번들 1건 더</small></th></tr></thead><tbody>'
+    + '<th>인터넷 = TV</th><th class="n">지급총액</th><th class="n">앞 구간보다</th>'
+    + '<th class="n">번들 건당<br><small style="font-weight:400">평균</small></th></tr></thead><tbody>'
     + rows.map(r=>'<tr'+(r.n===mark?' class="flag"':'')+'><td'+(r.n===mark?' class="b"':'')+'>'+fmtN(r.n)+'건'+(r.n===mark?' <span class="badge blue">지금</span>':'')+'</td>'
-        + '<td class="n">'+fmtN(Math.round(r.tw/10000))+'만원</td><td class="n">'+fmtN(r.unit)+'</td>'
-        + '<td class="n'+(hot(r.per)?' badc':'')+'">'+(r.per==null?'<span class="dim">—</span>':fmtN(r.per))+'</td></tr>').join('')
+        + '<td class="n">'+fmtN(Math.round(r.tw/10000))+'만원</td>'
+        + '<td class="n">'+(r.d==null?'<span class="dim">—</span>':'<span class="cp">+'+fmtN(Math.round(r.d/10000))+'만원</span>')+'</td>'
+        + '<td class="n">'+fmtN(r.unit)+'</td></tr>').join('')
     + '</tbody></table></div>'
-    + '<div class="foot-note"><span>우리 목표는 인터넷과 TV가 1:1이라 <b>둘을 같이 늘릴 때</b>를 기준으로 줄 세웠습니다. '
-    + '<b>한계가치</b>는 그 구간을 넘길 때 늘어나는 총액을 늘어난 번들 수로 나눈 값입니다 — 번들 단가보다 크면 시장 최고가를 줘도 남습니다. '
-    + '<span class="bad">빨간 칸</span>은 평소의 1.5배를 넘는 구간입니다.</span></div></div>';
+    + '<div class="foot-note"><span>우리 목표는 인터넷과 TV가 1:1이라 둘을 같이 늘릴 때를 기준으로 줄 세웠습니다. '
+    + '<b>번들 건당</b>은 지급총액을 전체 건수에 고르게 나눈 값입니다.</span></div></div>';
   ds.innerHTML=h;
 }
 function renderDiffTable(){ renderGrade(); }
@@ -3110,7 +3105,7 @@ const PL={history:'월별 기록',table:'수수료표',grade:'그레이드 단�
 const PSUB={
   history:'쌓인 달을 넘겨 보고, 두 달을 맞대어 무엇이 바뀌었는지 봅니다',
   table :'정책 항목별 단가를 월별로 관리합니다',
-  grade :'실적에 따라 오르는 단가 — 단계별 차액과 한계가치',
+  grade :'칸을 눌러 그 달 그레이드 목표를 정합니다 · 한 단계 더 가면 얼마가 더 들어오는지 봅니다',
   goal:'본부 목표 대비 구간 · 달성률 · 미달하면 터질 금액',
   compare:'시장단가·상부 대비 우리 수수료 차액',
   rsum :'월말 확정값을 넣으면 나머지는 전부 계산됩니다',
