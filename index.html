@@ -768,6 +768,22 @@ body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
 .hd-t tr.flag td.hd-k{background:#fafbfd}
 .hd-rank{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 6px;border-radius:999px;background:#eef1f6;color:#5b6475;font-size:12px;font-weight:700}
 .hd-rank.hd-top{background:var(--green-w);color:var(--green)}
+
+.th-tags .goalp{font-size:9.5px;font-weight:800;border-radius:5px;padding:1px 5px;cursor:pointer;background:#fff1d6;color:#b7791f}
+.th-tags .goalp.off{background:none;color:transparent;border:1px dashed transparent}
+.ft th.th-pol:hover .th-tags .goalp.off{color:var(--dim);border-color:var(--line2)}
+
+.drops{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.drop{border:2px dashed var(--line2);border-radius:14px;padding:18px 16px;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:flex-start;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--pri);background:var(--pri-w)}
+.drop.ok{border-style:solid;border-color:#9bd8bd;background:var(--green-w)}
+.drop b{font-size:14.5px}.drop small{color:var(--sub);font-size:12px;word-break:break-all}.drop.ok small{color:var(--green);font-weight:600}
+.migr{border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.migr summary{cursor:pointer;font-weight:700;font-size:13px}
+.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.primary[disabled]{opacity:.4;cursor:default}
+body.readonly .hbtns .primary{display:none}
 /* ── 인쇄 ─────────────────────────────────────────────── */
 @media print{
   .sb,.top-r,.add-bar,.gb-sel,.rm-pol,#ro-banner{display:none!important}
@@ -1045,7 +1061,8 @@ window.SKY_CONFIG = {
       <div class="card">
         <div class="card-h">
           <h2><span class="ib c1"><svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><path d="M3 13V6M8 13V3M13 13V9"/></svg></span>월말 확정값 입력</h2>
-          <span class="hint">전산PC 정산서를 보면서 이 숫자만 넣으면 나머지는 전부 계산됩니다</span>
+          <div class="hbtns"><span id="settle-note"></span>
+            <button class="primary sm" onclick="openSettleUpload()" title="상부정산관리 · 전체정산관리 파일로 수령액·지급액·실적을 계산합니다">어드민 정산자료 불러오기</button></div>
         </div>
         <div class="add-bar" style="box-shadow:none;border:1px solid var(--line);margin-bottom:10px">
           <label>실적</label>
@@ -2059,6 +2076,8 @@ function renderTable(){
       th+='<th class="th-pol'+(need?' th-need':'')+'" data-pid="'+p.id+'"><div class="th-tags">'
         + (isNew? '<span class="newp" title="'+ymLabel(_prevSt.ym)+'에는 없던 정책">새</span>':'')
         + '<span class="scope '+sc+'" onclick="cyclePolScope(\''+p.id+'\')" title="누르면 본사↔본부">'+scopeLabel(sc)+'</span>'
+        + (polGoalKind(p)? '<span class="goalp" onclick="cyclePolGoal(\''+p.id+'\')" title="목표달성 정책 — 달성해야 들어오는 돈이라 미달하면 터진 금액으로 잡힙니다 (누르면 인터넷→TV→해제)">목표 '+(polGoalKind(p)==='in'?'IN':'TV')+'</span>'
+           : (ro?'':'<span class="goalp off" onclick="cyclePolGoal(\''+p.id+'\')" title="목표달성 정책이면 눌러서 표시">목표?</span>'))
         + (copiedFrom? '<span class="chk'+(ck?' on':'')+'" onclick="polCheck(\''+p.id+'\')" title="'+(ck?'금액 확인함':'금액 확인 필요 — 누르면 확인 표시')+'">'+(ck?'✓':'!')+'</span>':'')
         + '</div><div class="ph" '+(ro?'':'onclick="editPolHead(\''+p.id+'\')" title="눌러서 정책번호·이름 고치기"')+'>'
         + '<span class="pn">'+esc(p.num||p.id)+'</span><span class="pm">'+esc(p.name||'')+'</span></div></th>';
@@ -4206,6 +4225,7 @@ function rpMemo(v){ reviewMemo=v; if(canEdit()) autoSave(); }
 
 function initReport(){
   document.querySelectorAll('.rp-month').forEach(e=>e.textContent=curMonth||'—');
+  const sn=document.getElementById('settle-note'); if(sn) sn.innerHTML=settleNoteHtml();
   renderRSum();
   const on=id=>document.getElementById(id)&&document.getElementById(id).classList.contains('on');
   if(on('page-rgrade')) renderRGrade();
@@ -4533,6 +4553,53 @@ const GL_EPS=1e-9;   // 57/100*100 = 56.99999… 같은 소수 오차로 문턱�
 function glHit(tiers, rate){
   let hit=null; tiers.forEach(t=>{ if(rate+GL_EPS>=t[0]) hit=t; }); return hit;
 }
+/* 수수료표에서 '목표달성' 정책 열 찾기.
+   목표를 달성해야 본사에서 들어오는 돈인데 하부점에는 미리 깔아 주는 정책이다.
+   p.goal = 'in' | 'tv' | false(아님). 지정하지 않았으면 이름으로 알아본다 (예: 'IN전체 목표달성', 'TV전체 목표달성'). */
+function polGoalKind(p){
+  if(p.goal==='in'||p.goal==='tv') return p.goal;
+  if(p.goal===false) return null;
+  const t=String(p.name||'')+' '+String(p.num||'');
+  if(!/목표/.test(t)) return null;
+  if(/TV|티비|티 |Mass/i.test(t)) return 'tv';
+  if(/IN|인터넷|^인 /i.test(t)) return 'in';
+  return null;
+}
+function cyclePolGoal(id){
+  if(!requireEdit()) return;
+  const p=policies.find(x=>x.id===id); if(!p) return;
+  const cur=polGoalKind(p);
+  p.goal = cur==='in'? 'tv' : cur==='tv'? false : 'in';
+  saveAll(); renderTable();
+  const lab={in:'인터넷 목표달성',tv:'TV 목표달성'}[polGoalKind(p)]||'목표달성 아님';
+  showGsStatus('"'+(p.name||p.num)+'" → '+lab);
+}
+/* 하부점에 깔아 준 목표달성 건당 금액 (일반 / 30%홈결합 행을 나눠 가장 흔한 금액).
+   st 를 주면 그 달 저장값으로 계산한다. */
+function goalLaidUnits(kind, st){
+  const S = st || {pols:policies.filter(p=>p.apply), polVals, DEF, selIN, ROWS};
+  const pols=(S.pols||[]).filter(p=>polGoalKind(p)===kind);
+  if(!pols.length) return null;
+  const rows=S.ROWS||BASE_ROWS;
+  let cat='', tv='', sec='';
+  const pick={normal:{}, home:{}};
+  rows.forEach((r,i)=>{
+    if(r.sec!=null){ sec=String(r.sec); cat=''; tv=''; }
+    if(r.cat!=null) cat=String(r.cat);
+    if(r.tv!=null) tv=String(r.tv);
+    const hasIn=!!r.in, hasTv=!!tv && !/인터넷/.test(sec);
+    if(kind==='in'&&!hasIn) return;
+    if(kind==='tv'&&!hasTv) return;
+    const v=pols.reduce((a,p)=>a+valOf(S,p.id,i),0);
+    if(!v) return;
+    const g=/30%|홈30/.test(cat)? 'home':'normal';
+    pick[g][v]=(pick[g][v]||0)+1;
+  });
+  const mode=o=>{ let best=0,n=-1; Object.keys(o).forEach(k=>{ if(o[k]>n){n=o[k];best=+k;} }); return best; };
+  const n=mode(pick.normal), h=mode(pick.home);
+  return {n: n||h, h: h||n, names: pols.map(p=>p.name||p.num)};
+}
+
 /* r 을 주면 그 달 저장값(sky_months 행)으로, 안 주면 지금 보는 달로 계산한다 */
 function glCalc(kind, r){
   const I=kind==='in';
@@ -4551,7 +4618,12 @@ function glCalc(kind, r){
   const topN=tN[tN.length-1][1], topH=tH[tH.length-1][1];
 
   const paid = norm*uN + home*uH;          // 실제 받을 금액
-  const laid = norm*topN + home*topH;      // 100% 가정으로 수수료표에 깔아둔 금액
+  // 깔아둔 금액 : 수수료표에 '목표달성' 정책 열이 있으면 그 금액 그대로 (하부점에 실제로 깔아 준 돈),
+  //              없으면 구간표의 100% 단가로 본다 (110% 같은 초과 구간은 깔아 두지 않으므로 쓰지 않는다)
+  const at100=t=>{ const h=glHit(t,100); return h? h[1] : t[t.length-1][1]; };
+  const LU = goalLaidUnits(kind, r? (stOf(r.month)||{pols:[]}) : undefined);
+  const laidN = LU? LU.n : at100(tN), laidH = LU? LU.h : at100(tH);
+  const laid = norm*laidN + home*laidH;
 
   // 다음 문턱 : 두 구간표의 문턱을 합쳐 가장 가까운 것
   const pts=[...new Set(tN.map(t=>t[0]).concat(tH.map(t=>t[0])))].sort((a,b)=>a-b);
@@ -4566,7 +4638,7 @@ function glCalc(kind, r){
     per  = need>0? Math.round(gain/need) : null;
   }
   return {kind, goal, actual, home, norm, rate:Math.floor(rate*10+GL_EPS)/10,
-          uN, uH, topN, topH, paid, laid, burst:paid-laid,
+          uN, uH, topN, topH, paid, laid, burst:paid-laid, laidN, laidH, laidFrom: LU? LU.names : null,
           nextPt, need, gain, per, atCnt, tN, tH};
 }
 
@@ -4620,7 +4692,10 @@ function glCard(kind){
     +       row('30%홈결합 '+fmtN(c.home)+'건', unitTxt(c.uH,c.tH))
     +       '<div style="border-top:1px dashed var(--line);margin:6px 0"></div>'
     +       row('받을 금액', fmtN(c.paid)+'원')
-    +       row('깔아둔 금액 <span class="dim">(100% 기준)</span>', '<span class="dim">'+fmtN(c.laid)+'원</span>')
+    +       row('깔아둔 금액 <span class="dim">'+(c.laidFrom? '(수수료표 '+esc(c.laidFrom.join(' + '))+')' : '(구간표 100% 기준)')+'</span>',
+                 '<span class="dim">'+fmtN(c.laid)+'원</span>')
+    +       '<div style="font-size:11.5px;color:var(--dim);text-align:right;margin-top:-2px">일반 '+fmtN(c.norm)+'×'+fmtN(c.laidN)
+    +         ' + 30%홈 '+fmtN(c.home)+'×'+fmtN(c.laidH)+'</div>'
     +       row('<b>터질 금액</b>', '<span class="'+(c.burst<0?'cn':'cp')+' b">'+fmtN(c.burst)+'원</span>')
     +     '</div></div>'
     +   nx
@@ -5071,6 +5146,280 @@ const ICO={
   list:'<svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"/></svg>',
   grid:'<svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M1.5 6h13M1.5 10.5h13M6 1.5v13"/></svg>'
 };
+
+
+// ══════════════════════════════════════════════════════════════
+//  어드민 정산자료 불러오기
+//
+//  정산은 개통월 익월 25일에 나와서, 회의 시점엔 '정산 수령액'을 손으로 알 수 없다.
+//  회사 어드민의 두 자료를 올리면 SKYLIFE 유선 행만 골라 계산한다.
+//   · 상부정산관리  → 본사에서 들어올 금액 (정산금액)          = 정산 수령액
+//   · 전체정산관리  → 협력점에 나간 금액   (약정금액)          = 하부점 지급액
+//  고르는 규칙은 코드실적 계산기(wooriwoosin.github.io/code)와 똑같다.
+// ══════════════════════════════════════════════════════════════
+const SETTLE={
+  lineCode:'1.유SKY-우리(월☆통25)',
+  marginTeams:['1.시흥영업팀','2.천안영업팀'],
+  marginPerNet:100000,
+  files:{}, result:null
+};
+const sKey=v=>String(v==null?'':v).replace(/ /g,' ').replace(/\s+/g,'').trim();
+const sNum=v=>{ const n=parseFloat(String(v==null?'':v).replace(/,/g,'')); return isNaN(n)?0:n; };
+function sClassify(pn){
+  const v=sKey(pn);
+  if(/CCTV/i.test(v)) return 'cctv';
+  if(/인터넷전화/.test(v)) return 'voip';
+  if(/일반전화|_전화$/.test(v)) return 'phone';
+  if(/TV/.test(v)) return 'tv';
+  if(/인터넷/.test(v)) return 'internet';
+  if(/부가상품/.test(v)) return 'extra';
+  return 'etc';
+}
+function sExReason(pn){
+  const k=sKey(pn), p=k.toUpperCase();
+  if(p.includes('정산관련')) return '정산관련';
+  if(p.includes('추가지급')) return '추가지급';
+  if(/_관리$|^모바일_관리$/.test(k)) return '관리수수료';
+  return '';
+}
+/* 2차원 배열 → 행 객체 (헤더는 '상품명'+'상부점'이 있는 줄) */
+function sParseRows(raw){
+  let hi=-1;
+  for(let i=0;i<Math.min(8,raw.length);i++){
+    const r=(raw[i]||[]).map(v=>String(v==null?'':v).trim());
+    if(r.includes('상품명')&&r.includes('상부점')){ hi=i; break; }
+  }
+  if(hi<0) throw new Error("헤더 줄을 찾지 못했습니다 ('상품명'과 '상부점' 열이 있어야 합니다)");
+  const h0=(raw[hi]||[]).map(v=>String(v==null?'':v).trim());
+  const h1=(raw[hi+1]||[]).map(v=>String(v==null?'':v).trim());
+  const heads=h0.map((v,i)=>(v===''&&h1[i])?h1[i]:v);
+  const seen={}; const H=heads.map(h=>{ if(seen[h]!==undefined){ seen[h]++; return h+'_'+seen[h]; } seen[h]=0; return h; });
+  const sub=h1.length>0 && !h1.includes('상품명') && h1.some(v=>v!=='') && String(h1[0]||'').trim()==='';
+  return raw.slice(hi+(sub?2:1)).map(row=>{ const o={}; H.forEach((h,i)=>o[h]=(row&&row[i]!=null)?String(row[i]).trim():''); return o; })
+            .filter(r=>{ const no=r['No']||''; return no!==''&&!no.includes('화면')&&no!=='No'; });
+}
+function sParseHtml(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const table=doc.querySelector('table'); if(!table) throw new Error('표를 찾지 못했습니다');
+  const grid=[];
+  [...table.querySelectorAll('tr')].forEach((tr,ri)=>{
+    grid[ri]=grid[ri]||[]; let ci=0;
+    [...tr.querySelectorAll('td,th')].forEach(cell=>{
+      while(grid[ri][ci]!==undefined) ci++;
+      const t=cell.textContent.replace(/\s+/g,' ').trim();
+      const rs=+cell.getAttribute('rowspan')||1, cs=+cell.getAttribute('colspan')||1;
+      for(let r=ri;r<ri+rs;r++){ grid[r]=grid[r]||[]; for(let c=ci;c<ci+cs;c++) grid[r][c]=t; }
+      ci+=cs;
+    });
+  });
+  return grid;
+}
+function sReadFile(file){
+  return new Promise((res,rej)=>{
+    const r1=new FileReader();
+    r1.onload=e=>{
+      try{
+        if(typeof XLSX==='undefined') throw new Error('엑셀 라이브러리를 불러오지 못했습니다');
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const sn=wb.SheetNames[0];
+        const raw=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
+        const first=(raw[0]||[]).join('');
+        if(/상부점|상품명|정산|No/.test(first) || raw.slice(0,8).some(r=>(r||[]).includes('상품명')))
+          return res({name:file.name, sheet:sn, rows:sParseRows(raw)});
+        throw new Error('retry');
+      }catch(err){
+        const r2=new FileReader();
+        r2.onload=e2=>{ try{ res({name:file.name, sheet:'', rows:sParseRows(sParseHtml(e2.target.result))}); }catch(e3){ rej(e3); } };
+        r2.readAsText(file,'euc-kr');
+      }
+    };
+    r1.onerror=()=>rej(new Error('파일을 읽지 못했습니다'));
+    r1.readAsArrayBuffer(file);
+  });
+}
+function sKindOf(f){
+  const s=sKey(f.sheet)+sKey(f.name);
+  if(s.includes('상부정산')||s.includes('상부정책')) return 'up';
+  if(s.includes('전체정산')) return 'all';
+  // 내용으로 판단 : 약정금액 열이 있으면 전체정산
+  if(f.rows.length && ('약정금액' in f.rows[0])) return 'all';
+  if(f.rows.length && ('정산금액' in f.rows[0])) return 'up';
+  return '';
+}
+/* SKYLIFE 유선 행만 고르기 (계산기와 같은 규칙) */
+function sPick(rows){
+  const K=sKey(SETTLE.lineCode);
+  const hit=[], ex={}, drop={haeji:0, jong:{}};
+  rows.forEach(r=>{
+    if(sKey(r['상부점'])!==K) return;
+    const j=String(r['정산종류']||'').trim();
+    if(j!=='일반'){ drop.jong[j||'(공백)']=(drop.jong[j||'(공백)']||0)+1; return; }
+    if(String(r['개통상태']||'').includes('해지')){ drop.haeji++; return; }
+    const why=sExReason(r['상품명']);
+    if(why){ const pn=r['상품명']||'(공백)'; ex[pn]=ex[pn]||{cnt:0,amt:0,why}; ex[pn].cnt++; ex[pn].amt+=sNum(r['정산금액']||r['약정금액']); return; }
+    hit.push(r);
+  });
+  return {hit, ex, drop};
+}
+function sMonthOf(rows){
+  const c={};
+  rows.forEach(r=>{ const m=String(r['정산예정일']||'').match(/(\d{4})[-.\/](\d{1,2})/); if(m){ const k=m[1]+'-'+('0'+m[2]).slice(-2); c[k]=(c[k]||0)+1; } });
+  let best='',n=0; Object.keys(c).forEach(k=>{ if(c[k]>n){n=c[k];best=k;} }); return best;
+}
+function settleCompute(){
+  const up=SETTLE.files.up, all=SETTLE.files.all;
+  const R={up:null, all:null};
+  if(up){
+    const p=sPick(up.rows);
+    const by={}; let net=0, tv=0, home=0, homeTv=0, grade=0, goal=0;
+    p.hit.forEach(r=>{
+      const pn=r['상품명']||'(공백)', amt=sNum(r['정산금액']), k=sClassify(pn);
+      by[pn]=by[pn]||{cnt:0,amt:0,k}; by[pn].cnt++; by[pn].amt+=amt;
+      if(k==='internet'){ net++; if(/30%|홈결합/.test(pn)) home++; }
+      if(k==='tv'){ tv++; if(/30%|홈결합/.test(pn)) homeTv++; }
+      if(/그레이드/.test(pn)) grade+=amt;
+      if(/목표/.test(pn)) goal+=amt;
+    });
+    R.up={file:up.name, rows:p.hit.length, total:p.hit.reduce((a,r)=>a+sNum(r['정산금액']),0),
+          net, tv, home, homeTv, grade, goal, by, ex:p.ex, drop:p.drop, month:sMonthOf(up.rows)};
+  }
+  if(all){
+    const p=sPick(all.rows);
+    const pos=p.hit.filter(r=>sNum(r['약정금액'])>0);
+    const team=p.hit.filter(r=>SETTLE.marginTeams.includes(String(r['협력점']||'').trim()) && sClassify(r['상품명'])==='internet');
+    const byP={};
+    p.hit.forEach(r=>{ const k=String(r['협력점']||'(공백)').trim(); byP[k]=byP[k]||{cnt:0,amt:0}; byP[k].cnt++; byP[k].amt+=Math.max(0,sNum(r['약정금액'])); });
+    R.all={file:all.name, rows:p.hit.length, paid:pos.reduce((a,r)=>a+sNum(r['약정금액']),0),
+           margin:team.length*SETTLE.marginPerNet, marginCnt:team.length, byP, ex:p.ex, drop:p.drop, month:sMonthOf(all.rows)};
+  }
+  SETTLE.result=R;
+  return R;
+}
+/* 정산예정일 달 → 개통월 (정산은 개통 익월 25일) */
+const prevYm=ym=>{ if(!ym) return ''; let [y,m]=ym.split('-').map(Number); m--; if(!m){m=12;y--;} return y+'-'+String(m).padStart(2,'0'); };
+
+function openSettleUpload(){
+  if(!requireEdit()) return;
+  SETTLE.files={}; SETTLE.result=null;
+  openModal('어드민 정산자료 불러오기',
+    '<p class="sub" style="margin:0 0 14px">회사 어드민에서 받은 <b>상부정산관리</b>(본사에서 들어올 금액)와 <b>전체정산관리</b>(협력점에 나간 금액) 파일을 올리면 '
+   +'<b>'+esc(SETTLE.lineCode)+'</b> 행만 골라 정산 수령액·하부점 지급액·실적 건수를 계산합니다. 코드실적 계산기와 같은 규칙입니다.</p>'
+   +'<div class="drops">'
+   + '<label class="drop" id="sd-up"><input type="file" accept=".xlsx,.xls,.html,.htm" hidden onchange="settlePick(this,\'up\')"><b>상부정산관리</b><small>본사 정산 예정 · 정산금액</small></label>'
+   + '<label class="drop" id="sd-all"><input type="file" accept=".xlsx,.xls,.html,.htm" hidden onchange="settlePick(this,\'all\')"><b>전체정산관리</b><small>협력점 지급 · 약정금액</small></label>'
+   +'</div><div id="sd-out"></div>', {wide:true});
+  document.querySelectorAll('#gmodal .drop').forEach(d=>{
+    d.addEventListener('dragover',e=>{ e.preventDefault(); d.classList.add('over'); });
+    d.addEventListener('dragleave',()=>d.classList.remove('over'));
+    d.addEventListener('drop',e=>{ e.preventDefault(); d.classList.remove('over');
+      const f=e.dataTransfer.files[0]; if(f) settleLoad(f, d.id==='sd-up'?'up':'all'); });
+  });
+}
+function settlePick(inp,slot){ const f=inp.files[0]; if(f) settleLoad(f,slot); }
+async function settleLoad(file, slot){
+  const box=document.getElementById(slot==='up'?'sd-up':'sd-all');
+  try{
+    const f=await sReadFile(file);
+    const kind=sKindOf(f);
+    if(kind && kind!==slot){ slot=kind; }      // 칸을 바꿔 올려도 내용으로 알아서 맞춘다
+    SETTLE.files[slot]=f;
+    const b=document.getElementById(slot==='up'?'sd-up':'sd-all');
+    b.classList.add('ok'); b.querySelector('small').textContent=file.name+' · '+fmtN(f.rows.length)+'행';
+    settleRender();
+  }catch(e){
+    if(box){ box.classList.remove('ok'); box.querySelector('small').textContent='⚠ '+(e.message||e); }
+  }
+}
+function settleRender(){
+  const out=document.getElementById('sd-out'); if(!out) return;
+  const keep={}; out.querySelectorAll('input[type=checkbox][id^="sa-"]').forEach(c=>keep[c.id]=c.checked);   // 다시 그려도 고른 상태 유지
+  const R=settleCompute(), ym=curMonthKey();
+  const m=R.up? R.up.month : R.all? R.all.month : '';
+  const openYm=prevYm(m);
+  let h='';
+  if(m) h+='<div class="foot-note" style="margin-top:14px'+(openYm!==ym?';background:var(--amber-w);color:#8a4b06':'')+'"><span>'
+      + '정산예정일 <b>'+ymLabel(m)+'</b> 자료 → 개통월 <b>'+ymLabel(openYm)+'</b>'
+      + (openYm!==ym? ' · <b>지금 보는 달('+ymLabel(ym)+')과 다릅니다.</b> 달을 바꾼 뒤 다시 올리거나, 그대로 반영하면 '+ymLabel(ym)+'에 들어갑니다.':' · 지금 보는 달과 맞습니다.')
+      + '</span></div>';
+  const cur=(v)=>v==null?'<span class="dim">비어 있음</span>':fmtN(v);
+  const line=(id,label,now,val,on,note)=>'<tr><td><label class="chk"><input type="checkbox" id="'+id+'" '+((id in keep? keep[id] : on)?'checked':'')+'> '+label+'</label>'
+      +(note?'<div class="dim small">'+note+'</div>':'')+'</td><td class="n">'+cur(now)+'</td><td class="n"><b>'+fmtN(val)+'</b></td></tr>';
+  let rows='';
+  if(R.up){
+    rows+=line('sa-rt','정산 수령액 (총액)', recvTotal, R.up.total, true, '상부정산 정산금액 합 · '+fmtN(R.up.rows)+'행');
+    if(R.up.grade) rows+=line('sa-rg','그중 그레이드', recvGrade, R.up.grade, true, "상품명에 '그레이드'가 있는 행");
+    if(R.up.goal)  rows+=line('sa-rl','그중 목표달성', recvGoal, R.up.goal, true, "상품명에 '목표'가 있는 행");
+    rows+=line('sa-ain','실적 인터넷', actualIN, R.up.net, actualIN==null, '인터넷 상품 행 수 (인터넷전화 제외)');
+    rows+=line('sa-atv','실적 TV', actualTV, R.up.tv, actualTV==null, 'TV 상품 행 수 (CCTV 제외)');
+    if(R.up.home||R.up.homeTv){
+      rows+=line('sa-min','그중 30%홈결합 인터넷', mix30IN, R.up.home, mix30IN==null, "상품명에 '30%' 또는 '홈결합'");
+      rows+=line('sa-mtv','그중 30%홈결합 TV', mix30TV, R.up.homeTv, mix30TV==null, "상품명에 '30%' 또는 '홈결합'");
+    }
+  }
+  if(R.all){
+    rows+=line('sa-ps','하부점 지급액', paidSub, R.all.paid+(SETTLE.addMargin?R.all.margin:0), true,
+      '전체정산 약정금액(0 초과) 합 · '+fmtN(R.all.rows)+'행'
+      +(R.all.marginCnt? ' · <label class="chk" style="display:inline-flex"><input type="checkbox" '+(SETTLE.addMargin?'checked':'')+' onchange="SETTLE.addMargin=this.checked;settleRender()"> 자점운영마진 '+fmtN(R.all.margin)+'원 포함 (시흥·천안 인터넷 '+R.all.marginCnt+'건)</label>':''));
+  }
+  if(rows) h+='<div class="tw" style="margin-top:14px;max-height:none"><table class="t"><thead><tr><th>반영할 값</th><th class="n">지금 값</th><th class="n">자료에서 계산</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+  // 확인용 내역
+  if(R.up){
+    const list=Object.entries(R.up.by).sort((a,b)=>b[1].amt-a[1].amt);
+    h+='<details class="migr" style="margin-top:12px"><summary>상부정산 상품별 내역 ('+list.length+'종)</summary><div class="tw" style="margin-top:8px;max-height:260px"><table class="t sm"><thead><tr><th>상품명</th><th>분류</th><th class="n">건수</th><th class="n">정산금액</th></tr></thead><tbody>'
+      + list.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+({internet:'인터넷',tv:'TV',extra:'부가상품',cctv:'CCTV',voip:'인터넷전화',phone:'일반전화',etc:'기타'}[v.k])+'</td><td class="n">'+fmtN(v.cnt)+'</td><td class="n">'+fmtN(v.amt)+'</td></tr>').join('')
+      + '</tbody></table></div>'+settleExHtml(R.up)+'</details>';
+  }
+  if(R.all){
+    const list=Object.entries(R.all.byP).sort((a,b)=>b[1].amt-a[1].amt);
+    h+='<details class="migr" style="margin-top:8px"><summary>전체정산 협력점별 내역 ('+list.length+'곳)</summary><div class="tw" style="margin-top:8px;max-height:260px"><table class="t sm"><thead><tr><th>협력점</th><th class="n">건수</th><th class="n">약정금액</th></tr></thead><tbody>'
+      + list.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td class="n">'+fmtN(v.cnt)+'</td><td class="n">'+fmtN(v.amt)+'</td></tr>').join('')
+      + '</tbody></table></div>'+settleExHtml(R.all)+'</details>';
+  }
+  if(!R.up&&!R.all) h+='';
+  else if((R.up&&!R.up.rows)||(R.all&&!R.all.rows)) h+='<div class="foot-note" style="background:var(--up-w);color:var(--up)"><span>⚠ <b>'+esc(SETTLE.lineCode)+'</b> 행을 찾지 못한 파일이 있습니다. 상부점 코드가 바뀌었는지 확인하세요.</span></div>';
+  h+='<div class="mfoot"><button class="ghost" onclick="closeModal()">닫기</button>'
+   + '<button class="primary" '+(rows?'':'disabled')+' onclick="settleApply()">'+ymLabel(ym)+'에 반영</button></div>';
+  out.innerHTML=h;
+}
+function settleExHtml(x){
+  const ex=Object.entries(x.ex||{}), jong=Object.entries(x.drop.jong||{});
+  if(!ex.length && !jong.length && !x.drop.haeji) return '';
+  return '<div class="dim small" style="margin-top:8px;line-height:1.7">빠진 행 — '
+    + [x.drop.haeji? '해지 '+fmtN(x.drop.haeji)+'행' : '',
+       ...jong.map(([k,n])=>'정산종류 '+esc(k)+' '+fmtN(n)+'행'),
+       ...ex.map(([k,v])=>esc(k)+' ('+v.why+') '+fmtN(v.cnt)+'행 '+fmtN(v.amt)+'원')].filter(Boolean).join(' · ')
+    + '</div>';
+}
+function settleApply(){
+  if(!requireEdit()) return;
+  const R=SETTLE.result; if(!R) return;
+  const on=id=>{ const e=document.getElementById(id); return !!(e&&e.checked); };
+  if(R.up){
+    if(on('sa-rt'))  recvTotal=R.up.total;
+    if(on('sa-rg'))  recvGrade=R.up.grade;
+    if(on('sa-rl'))  recvGoal=R.up.goal;
+    if(on('sa-ain')) actualIN=R.up.net;
+    if(on('sa-atv')) actualTV=R.up.tv;
+    if(on('sa-min')) mix30IN=R.up.home;
+    if(on('sa-mtv')) mix30TV=R.up.homeTv;
+  }
+  if(R.all && on('sa-ps')) paidSub=R.all.paid+(SETTLE.addMargin?R.all.margin:0);
+  autoSave();
+  // 어떤 파일로 계산했는지 남겨 둔다
+  const ym=curMonthKey();
+  sbSaveSetting('settle:'+ym, {at:new Date().toISOString(), by:(sbUser&&sbUser.email)||'',
+    up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,month:R.up.month},
+    all:R.all&&{file:R.all.file,paid:R.all.paid,margin:SETTLE.addMargin?R.all.margin:0,rows:R.all.rows,month:R.all.month}});
+  closeModal(); initReport(); renderSideInfo();
+  showGsStatus(ymLabel(ym)+' 정산자료를 반영했습니다');
+}
+function settleNoteHtml(){
+  const s=SKY.settings&&SKY.settings['settle:'+curMonthKey()];
+  if(!s) return '';
+  return '<span class="hint">'+fmtWhen(s.at).replace(' 수정','')+' 어드민 자료 반영'
+    + (s.up? ' · 상부정산 '+esc(s.up.file):'')+(s.all? ' · 전체정산 '+esc(s.all.file):'')+'</span>';
+}
 
 </script>
 </body>
