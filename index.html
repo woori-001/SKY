@@ -3975,7 +3975,9 @@ function rpGradeCmp(){
   const won=(iv,tv)=> (iv&&tv)? (mxLookup(iv,tv)||0)*10000 : null;   // 표의 '-' 칸은 0원
   const planIN=selIN, planTV=selTV;
   const actIN=floorIN(actualIN), actTV=floorTV(actualTV);
-  const plan=won(planIN,planTV), act=won(actIN,actTV);
+  const plan=won(planIN,planTV);
+  // 실적을 넣었는데 표의 최소 구간에도 못 미치면 그레이드는 0원
+  const act=(actIN&&actTV)? won(actIN,actTV) : ((actualIN!=null||actualTV!=null)? 0 : null);
   return {planIN, planTV, actIN, actTV, plan, act,
           gap:(plan!=null&&act!=null)?act-plan:null,
           recv:recvGrade,
@@ -4003,12 +4005,36 @@ function rpMix(kind){
           lost:   c.home*(c.uN-c.uH)};       // 전부 일반이었다면 더 받았을 금액
 }
 
+/* ── 그레이드 터진 금액 ─────────────────────────────────────
+   수수료표에는 월초에 잡은 목표(예: 300×300)의 건당 단가를 깔아 하부점에 준다.
+   실제로는 도달한 구간의 총액만 들어오므로, 목표에 못 미치면 그 차이만큼 터진다.
+     깔아준 금액 = 인터넷 실적 × 인터넷 건당 + TV 실적 × TV 건당   (건당 = 목표 총액 × 55% ÷ 목표 건수 …)
+     받을 금액   = 정산서 그레이드 수령액 (넣었으면) / 아니면 실제 도달 구간의 총액
+   r 을 주면 그 달 저장값으로 계산한다. */
+function gradeBurst(r){
+  const sIN=r? r.sel_in : selIN, sTV=r? r.sel_tv : selTV;
+  const aIN=r? r.actual_in : actualIN, aTV=r? r.actual_tv : actualTV;
+  if(!sIN||!sTV||(aIN==null&&aTV==null)) return null;
+  const look=(iv,tv)=> r? mxLookupFor(r.month,iv,tv) : mxLookup(iv,tv);
+  const plan=(look(sIN,sTV)||0)*10000;
+  if(!plan) return null;
+  const inU=Math.round(plan*.55/sIN), tvU=Math.round(plan*.45/sTV);
+  const laid=(aIN||0)*inU+(aTV||0)*tvU;
+  const fIN=floorIN(aIN||0), fTV=floorTV(aTV||0);
+  const reach=(fIN&&fTV)? (look(fIN,fTV)||0)*10000 : 0;
+  const rg=r? r.recv_grade : recvGrade;
+  const paid= rg!=null? rg : reach;
+  return {sIN, sTV, plan, inU, tvU, aIN:aIN||0, aTV:aTV||0, laid, fIN, fTV, reach, paid, fromRecv: rg!=null, burst: paid-laid};
+}
+
 /* ── 손익 ────────────────────────────────────────────────── */
 function rpPL(){
   const cnt=(actualIN||0)+(actualTV||0);
   const margin=(recvTotal!=null&&paidSub!=null)? recvTotal-paidSub : null;
-  const burst=['in','tv'].reduce((s,k)=>{ const c=glCalc(k); return s+(c?c.burst:0); },0);
-  return {recvTotal, paidSub, margin, cnt, burst, recvGrade, recvGoal,
+  const burstGoal=['in','tv'].reduce((s,k)=>{ const c=glCalc(k); return s+(c?c.burst:0); },0);
+  const gb=gradeBurst(), burstGrade=gb? gb.burst : 0;
+  const burst=burstGoal+burstGrade;
+  return {recvTotal, paidSub, margin, cnt, burst, burstGoal, burstGrade, gb, recvGrade, recvGoal,
           perCase:(margin!=null&&cnt)? Math.round(margin/cnt):null,
           rate:(margin!=null&&recvTotal)? Math.round(margin/recvTotal*1000)/10:null,
           other:(recvTotal!=null)? recvTotal-(recvGrade||0)-(recvGoal||0):null};
@@ -4043,7 +4069,7 @@ function renderRSum(){
     + kpi('c2','TV 달성률', gt? gt.rate.toFixed(1)+'<small>%</small>':'—',
           gt? fmtN(gt.actual)+'건 / '+fmtN(gt.goal)+'건'+vsPrev(gt.rate, ps&&ps.gt&&ps.gt.rate,'%'):'')
     + kpi('c3','터진 금액','<span class="'+rpCls(pl.burst)+'">'+(pl.burst?rpSign(pl.burst):'0원')+'</span>',
-          '목표달성 100% 로 깔아둔 단가 대비'+vsPrev(pl.burst||0, ps&&ps.hasGoal? ps.burst:null))
+          '목표달성 '+rpSign(pl.burstGoal||0)+' · 그레이드 '+rpSign(pl.burstGrade||0)+vsPrev(pl.burst||0, ps&&ps.hasGoal? ps.burst:null))
     + kpi('c4','실마진', pl.margin!=null?'<span class="'+rpCls(pl.margin)+'">'+rpSign(pl.margin)+'</span>':'—',
           pl.perCase!=null? ('건당 '+fmtN(pl.perCase)+'원'+vsPrev(pl.margin, ps&&ps.margin))
                           : '정산 수령액과 지급액을 넣어주세요');
@@ -4060,9 +4086,13 @@ function renderRSum(){
     if(c.burst<0)
       L.push(['bad', lab+' 100% 로 깔아둔 단가 대비 <b>'+fmtN(c.burst)+'원</b>이 터졌습니다']);
   });
-  if(gc.gap!=null && gc.gap!==0)
-    L.push([gc.gap>0?'ok':'warn','그레이드는 잡았던 '+fmtN(gc.planIN)+'×'+fmtN(gc.planTV)
-          +' 대비 실제 '+fmtN(gc.actIN)+'×'+fmtN(gc.actTV)+' 로 <b>'+rpSign(gc.gap)+'</b>']);
+  const gb=pl.gb;
+  if(gb && gb.burst<0)
+    L.push(['bad','그레이드는 '+fmtN(gb.sIN)+'×'+fmtN(gb.sTV)+' 목표 단가로 <b>'+rpWon(gb.laid)+'</b>을 깔아 줬는데 '
+          +(gb.fromRecv? '정산서 수령액은 ':'실제 도달 구간('+(gb.fIN&&gb.fTV? fmtN(gb.fIN)+'×'+fmtN(gb.fTV) : '구간 미달')+')은 ')
+          +'<b>'+rpWon(gb.paid)+'</b> — <b>'+rpSign(gb.burst)+'</b>이 터졌습니다']);
+  else if(gb && gb.burst>0)
+    L.push(['ok','그레이드는 깔아 준 '+rpWon(gb.laid)+'보다 <b>'+rpSign(gb.burst)+'</b> 더 들어옵니다']);
   ['in','tv'].forEach(k=>{
     const mx=rpMix(k); if(!mx||!mx.lost) return;
     L.push(['warn',(k==='in'?'인터넷':'TV')+' 30%홈결합이 '+fmtN(mx.home)+'건('+mx.ratio
@@ -4083,7 +4113,7 @@ function renderRSum(){
 
 function renderRGrade(){
   const el=document.getElementById('rg-body'); if(!el) return;
-  const g=rpGradeCmp();
+  const g=rpGradeCmp(), GB=gradeBurst();
   if(g.plan==null && g.act==null){
     el.innerHTML=rpEmpty('그레이드 목표를 잡고 실적을 넣으면 비교가 나옵니다'); return; }
   const row=(l,v,cls)=>'<tr><td>'+l+'</td><td class="n'+(cls?' '+cls:'')+'">'+v+'</td></tr>';
@@ -4091,16 +4121,20 @@ function renderRGrade(){
    + '<div class="tw"><table class="t"><tbody>'
    + row('월초에 잡은 목표', (g.planIN&&g.planTV)? fmtN(g.planIN)+' × '+fmtN(g.planTV)+'건':'—')
    + row('그때 예상 지급총액', g.plan!=null? rpMan(g.plan):'—')
-   + row('실제 도달 구간', (g.actIN&&g.actTV)? fmtN(g.actIN)+' × '+fmtN(g.actTV)+'건':'—')
-   + row('실제 지급총액', g.act!=null? rpMan(g.act):'—')
-   + row('<b>차이</b>', g.gap!=null?'<b>'+rpSign(g.gap)+'</b>':'—', rpCls(g.gap))
+   + row('실제 도달 구간', (g.actIN&&g.actTV)? fmtN(g.actIN)+' × '+fmtN(g.actTV)+'건'
+        : (g.act===0? '<span class="cn">구간 미달</span> <span class="dim">(인터넷 '+fmtN(actualIN||0)+' · TV '+fmtN(actualTV||0)+'건 — 표 최소 인터넷 '+IN_ALL[0]+' · TV '+TV_ALL[0]+'건)</span>':'—'))
+   + row('실제 지급총액', g.act!=null? (g.act? rpMan(g.act):'0원'):'—')
+   + row('목표 구간 총액 대비 <span class="dim">(목표에 도달했다면 받았을 총액과의 차이)</span>', g.gap!=null? rpSign(g.gap):'—', rpCls(g.gap))
+   + (GB? row('하부점에 깔아 준 금액 <span class="dim">(인터넷 '+fmtN(GB.aIN)+'×'+fmtN(GB.inU)+' + TV '+fmtN(GB.aTV)+'×'+fmtN(GB.tvU)+')</span>', rpWon(GB.laid))
+        + row('받을 금액 <span class="dim">('+(GB.fromRecv?'정산서':'실제 도달 구간')+')</span>', rpWon(GB.paid))
+        + row('<b>터진 금액</b>','<b>'+rpSign(GB.burst)+'</b>', rpCls(GB.burst)) : '')
    + (g.recv!=null? row('정산서 그레이드 수령액', rpWon(g.recv))
         + row('<b>계산과의 차이</b>','<b>'+rpSign(g.recvGap)+'</b>', rpCls(g.recvGap)) : '')
    + '</tbody></table></div>'
    + '<div class="foot-note"><span>'
    + (g.recvGap!=null && g.recvGap!==0
       ? '계산값과 정산서가 다릅니다. 어느 항목에서 벌어졌는지 정책번호별로 대조해 보세요.'
-      : '그레이드는 한 만큼 나오므로 미달해도 터지지 않습니다. 덜 받을 뿐입니다.')
+      : '수수료표에는 월초에 잡은 목표의 건당 단가를 깔아 줬기 때문에, 실제가 목표에 못 미치면 깔아 준 만큼 들어오지 않아 그 차이가 터집니다.')
    + '</span></div></div>';
 }
 
@@ -4144,8 +4178,8 @@ function renderRPL(){
   h+='<div class="card"><div class="card-h"><h2>목표를 채웠다면</h2></div>'
    + '<div class="tw"><table class="t"><tbody>'
    + row('지금 마진', rpSign(pl.margin), rpCls(pl.margin))
-   + row('터진 금액 <span class="dim">(목표달성 미달분)</span>', rpSign(pl.burst), rpCls(pl.burst))
-   + row('목표 100% 였다면', pl.margin!=null? rpSign(pl.margin-pl.burst):'—',
+   + row('터진 금액 <span class="dim">(목표달성 '+rpSign(pl.burstGoal)+' · 그레이드 '+rpSign(pl.burstGrade)+')</span>', rpSign(pl.burst), rpCls(pl.burst))
+   + row('목표대로 됐다면', pl.margin!=null? rpSign(pl.margin-pl.burst):'—',
          rpCls(pl.margin!=null? pl.margin-pl.burst : null), true)
    + '</tbody></table></div>'
    + '<div class="foot-note"><span>터진 금액은 이미 하부점에 나간 뒤라 회수할 수 없습니다. '
@@ -4286,8 +4320,8 @@ function rpSections(){
           ['하부점 지급액','-'+fmtN(pl.paidSub)+'원'],
           ['마진',(pl.margin>0?'+':'')+fmtN(pl.margin)+'원'],
           ...(pl.perCase!=null? [['건당 마진', fmtN(pl.perCase)+'원']]:[]),
-          ['터진 금액', fmtN(pl.burst)+'원'],
-          ['목표 100% 였다면',(pl.margin-pl.burst>0?'+':'')+fmtN(pl.margin-pl.burst)+'원']]});
+          ['터진 금액 (목표달성 '+fmtN(pl.burstGoal)+' · 그레이드 '+fmtN(pl.burstGrade)+')', fmtN(pl.burst)+'원'],
+          ['목표대로 됐다면',(pl.margin-pl.burst>0?'+':'')+fmtN(pl.margin-pl.burst)+'원']]});
 
   const mx=[];
   [['인터넷',rpMix('in')],['TV',rpMix('tv')]].forEach(([lab,m])=>{
@@ -4959,7 +4993,7 @@ function monthSummary(ym){
     npol: st.pols.length,
     unchecked: r.copied_from? st.pols.filter(p=>!chk[p.id]).length : 0,
     gradeTotal: mxLookupFor(ym, st.selIN, st.selTV),
-    burst: (gi?gi.burst:0)+(gt?gt.burst:0), hasGoal: !!(gi||gt),
+    burst: (gi?gi.burst:0)+(gt?gt.burst:0)+((gradeBurst(r)||{}).burst||0), hasGoal: !!(gi||gt||gradeBurst(r)),
     margin, perCase: (margin!=null&&cnt)? Math.round(margin/cnt) : null,
     recv:r.recv_total, paid:r.paid_sub};
 }
