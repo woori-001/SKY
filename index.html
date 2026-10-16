@@ -750,6 +750,13 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 body.readonly #copy-bar{display:none!important}
 body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
 .mp-m.has::after,.mp-m.on.has::after{display:none!important}
+
+/* 시장단가 자동 (상부 최고가) */
+.cmp-grp .t td.mkt-auto{line-height:1.25}
+.cmp-grp .t td.mkt-auto b{display:block;font-size:13.5px}
+.cmp-grp .t td.mkt-auto small{display:block;font-size:11px;color:var(--pri-d);font-weight:600}
+.fi.num.is-top{border-color:var(--pri);background:var(--pri-w);font-weight:700;color:var(--pri-d)}
+.fi.num.is-odd{border-color:var(--up);background:var(--up-w);color:var(--up);font-weight:700}
 /* ── 인쇄 ─────────────────────────────────────────────── */
 @media print{
   .sb,.top-r,.add-bar,.gb-sel,.rm-pol,#ro-banner{display:none!important}
@@ -3706,7 +3713,21 @@ function exportFeeTableToExcel(){
 // ═══════════════════════════════
 //  수수료 비교 페이지
 // ═══════════════════════════════
-let marketPriceData = {};  // 시장단가 저장
+let marketPriceData = {};  // 시장단가 (상부 값이 하나도 없는 상품만 직접 입력해 쓴다)
+
+/* 시장단가 = 옆 상부들 중 그 상품의 가장 높은 단가.
+   다른 상부보다 1.5배 넘게 튀는 값은 0 이 하나 더 들어간 오타일 가능성이 커서
+   최고가에서 빼고 칸을 빨갛게 표시한다. 상부 값이 하나도 없으면 직접 넣은 값을 쓴다. */
+function mktInfo(key, ri){
+  const vals=(SKY.cmpSrc||[]).map(s=>({id:s.id, name:s.name, v:cmpVal(s.id,ri)})).filter(x=>x.v>0);
+  if(!vals.length){ const m=+marketPriceData[key]||0; return {v:m, auto:false, names:[], odd:[]}; }
+  const sorted=vals.map(x=>x.v).sort((a,b)=>a-b);
+  const med=sorted[Math.floor((sorted.length-1)/2)];
+  const odd=vals.length>=3? vals.filter(x=>x.v>med*1.5) : [];
+  const ok=vals.filter(x=>!odd.includes(x));
+  const top=Math.max(...ok.map(x=>x.v));
+  return {v:top, auto:true, names:ok.filter(x=>x.v===top).map(x=>x.name), odd:odd.map(x=>x.id), med};
+}
 
 // 비교 대상 그룹 (홈30%IPTV, 일반번들IPTV)
 const CMP_GROUPS = [
@@ -3834,7 +3855,7 @@ function renderCompare(){
   const SRC = SKY.cmpSrc||[];
   window._cmpData=groups.map(g=>({label:g.label,catKey:g.catKey,
     rows:g.rows.map(r=>({tv:r.tv,in:r.in,ourFee:getOurFee(r.rowIdx),
-      mkt:marketPriceData[g.catKey+'_'+r.tv+'_'+r.in]||0,
+      mkt:mktInfo(g.catKey+'_'+r.tv+'_'+r.in, r.rowIdx).v,
       extras:SRC.map(s=>({name:s.name, val:cmpVal(s.id,r.rowIdx)}))}))}));
   window._cmpSrcNames=SRC.map(s=>s.name);
 
@@ -3858,26 +3879,30 @@ function renderCompare(){
   groups.forEach(g=>{
     const span={}; g.rows.forEach(r=>span[r.tv]=(span[r.tv]||0)+1);
     const done={};
-    const mk=g.rows.map(r=>marketPriceData[g.catKey+'_'+r.tv+'_'+r.in]||0);
+    const mk=g.rows.map(r=>mktInfo(g.catKey+'_'+r.tv+'_'+r.in, r.rowIdx).v);
     const filled=mk.filter(Boolean).length;
     const ds=g.rows.map((r,i)=>mk[i]? getOurFee(r.rowIdx)-mk[i] : null).filter(v=>v!=null);
     const avg=ds.length? Math.round(ds.reduce((a,b)=>a+b,0)/ds.length) : null;
     h+='<div class="card cmp-grp"><div class="card-h"><h2><span class="ib '+(g.catKey==='홈30%'?'c1':'c2')+'">'+ICO.grid+'</span>'+esc(g.label)+'</h2>'
-     + '<span class="hint">시장단가 '+filled+'/'+g.rows.length+' 입력'+(avg!=null? ' · 평균 차이 <b class="'+(avg>=0?'cp':'cn')+'">'+(avg>0?'+':'')+fmtN(avg)+'원</b>':'')+'</span></div>'
+     + '<span class="hint">시장단가 '+filled+'/'+g.rows.length+(avg!=null? ' · 평균 차이 <b class="'+(avg>=0?'cp':'cn')+'">'+(avg>0?'+':'')+fmtN(avg)+'원</b>':'')+'</span></div>'
      + '<div class="tw" style="max-height:none"><table class="t"><thead><tr>'
      + '<th>TV 상품</th><th>인터넷</th><th class="n">우리 수수료</th><th class="n">시장단가</th><th class="n">차이</th>'
      + SRC.map((s,k)=>'<th class="n src'+(k===0?' gl2':'')+'">'+esc(s.name)+'</th>').join('')
      + '</tr></thead><tbody>';
     g.rows.forEach((r,ri)=>{
-      const our=getOurFee(r.rowIdx), key=g.catKey+'_'+r.tv+'_'+r.in, m=marketPriceData[key]||0;
+      const our=getOurFee(r.rowIdx), key=g.catKey+'_'+r.tv+'_'+r.in, mi=mktInfo(key,r.rowIdx), m=mi.v;
       h+='<tr>';
       if(!done[r.tv]){ done[r.tv]=1; h+='<td class="tvc" rowspan="'+span[r.tv]+'">'+esc(r.tv||'—')+'</td>'; }
       h+='<td>'+esc(r.in)+'</td><td class="n"><b>'+fmtN(our)+'</b></td>'
-       + '<td class="n"><input class="fi num" data-k="m|'+esc(key)+'" value="'+(m||'')+'" placeholder="입력" '+(ro?'disabled':'')
-       +   ' onchange="marketPriceData[\''+key+'\']=parseInt(String(this.value).replace(/[^\\d]/g,\'\'))||0;saveMarketPrices();refreshCompareKeepFocus(this)"></td>'
+       + (mi.auto
+          ? '<td class="n mkt-auto" title="옆 상부 중 가장 높은 단가"><b>'+fmtN(m)+'</b><small>'+(mi.names.length>2? mi.names.length+'곳 같음' : esc(mi.names.join(' · ')))+'</small></td>'
+          : '<td class="n"><input class="fi num" data-k="m|'+esc(key)+'" value="'+(m||'')+'" placeholder="'+(SRC.length?'상부 값 없음':'입력')+'" '+(ro?'disabled':'')
+            +' onchange="marketPriceData[\''+key+'\']=parseInt(String(this.value).replace(/[^\\d]/g,\'\'))||0;saveMarketPrices();refreshCompareKeepFocus(this)"></td>')
        + '<td class="n">'+diffCell(our-m,m)+'</td>'
-       + SRC.map((s,k)=>'<td class="n src'+(k===0?' gl2':'')+'"><input class="fi num" value="'+(cmpVal(s.id,r.rowIdx)||'')+'" placeholder="입력" '+(ro?'disabled':'')
-           +' onchange="setCmpVal('+s.id+','+r.rowIdx+',parseInt(String(this.value).replace(/[^\\d]/g,\'\'))||0)"></td>').join('')
+       + SRC.map((s,k)=>{ const v=cmpVal(s.id,r.rowIdx), top=mi.auto&&v===m&&mi.names.length, odd=mi.odd&&mi.odd.includes(s.id);
+           return '<td class="n src'+(k===0?' gl2':'')+'"><input class="fi num'+(top?' is-top':'')+(odd?' is-odd':'')+'" value="'+(v||'')+'" placeholder="입력" '+(ro?'disabled':'')
+           +(odd?' title="다른 상부('+fmtN(mi.med)+'원 안팎)보다 1.5배 넘게 높아 시장단가에서 뺐습니다 — 0 이 하나 더 들어간 건 아닌지 확인하세요"':'')
+           +' onchange="setCmpVal('+s.id+','+r.rowIdx+',parseInt(String(this.value).replace(/[^\\d]/g,\'\'))||0);refreshCompareKeepFocus(this)"></td>'; }).join('')
        + '</tr>';
     });
     h+='</tbody></table></div></div>';
@@ -4394,7 +4419,7 @@ function hdRows(){
     if(r.sec!=null){ sec=String(r.sec).replace(/\n/g,' '); cat=''; tv=''; }
     if(r.cat!=null) cat=r.cat;
     if(r.tv !=null) tv =r.tv;
-    const mkt=+marketPriceData[cat+'_'+tv+'_'+(r.in||'')]||0;
+    const mkt=mktInfo(cat+'_'+tv+'_'+(r.in||''), i).v;
     if(!mkt) return;                       // 시장가를 안 넣은 상품은 줄 세울 수 없다
     const our=getOurFee(i), mg=mgmtFeeOf(i);
     out.push({i, label:[sec,cat,tv,r.in].filter(Boolean).join(' · '),
