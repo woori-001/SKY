@@ -757,6 +757,17 @@ body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
 .cmp-grp .t td.mkt-auto small{display:block;font-size:11px;color:var(--pri-d);font-weight:600}
 .fi.num.is-top{border-color:var(--pri);background:var(--pri-w);font-weight:700;color:var(--pri-d)}
 .fi.num.is-odd{border-color:var(--up);background:var(--up-w);color:var(--up);font-weight:700}
+
+/* 상품별 여력 : 수수료표처럼 구분·TV 묶음 */
+.hd-sort{margin:0 0 10px}
+.hd-t td{vertical-align:middle}
+.hd-t td.hd-k{vertical-align:top;font-weight:600;color:#3a4252;background:#fafbfd;border-right:1px solid #f1f3f6;white-space:nowrap}
+.hd-t td.hd-in{font-weight:600}
+.hd-t tr.gtop td{border-top:1px solid #e1e6ee}
+.hd-t.rk td.hd-k{vertical-align:middle;background:none;font-weight:500;color:#4a5263}
+.hd-t tr.flag td.hd-k{background:#fafbfd}
+.hd-rank{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 6px;border-radius:999px;background:#eef1f6;color:#5b6475;font-size:12px;font-weight:700}
+.hd-rank.hd-top{background:var(--green-w);color:var(--green)}
 /* ── 인쇄 ─────────────────────────────────────────────── */
 @media print{
   .sb,.top-r,.add-bar,.gb-sel,.rm-pol,#ro-banner{display:none!important}
@@ -971,7 +982,7 @@ window.SKY_CONFIG = {
           <p class="sub" style="margin:0 0 14px">
             시장가와의 차액에 그 상품의 관리수수료를 더해, <b>어느 상품에 단가를 더 얹을 수 있는지</b> 줄 세웁니다.
           </p>
-          <div class="tw" id="hd-wrap"></div>
+          <div id="hd-wrap"></div>
           <div class="foot-note">
             <span>관리수수료는 3년에 걸쳐 들어오는 미래 현금입니다. 즉시 나가는 단가로 전액을 태우면 그만큼 현금이 먼저 빠집니다.
             그리고 우리 수수료에 <b>목표달성</b>을 정책항목으로 넣어두셨다면, 목표를 못 채울 때 그만큼 줄어듭니다
@@ -4423,9 +4434,14 @@ function hdRows(){
     if(!mkt) return;                       // 시장가를 안 넣은 상품은 줄 세울 수 없다
     const our=getOurFee(i), mg=mgmtFeeOf(i);
     out.push({i, label:[sec,cat,tv,r.in].filter(Boolean).join(' · '),
+              sec:sec.replace(/^번들\s*/,'번들 '), cat, tv, inn:r.in||'',
               our, mkt, diff:our-mkt, mg,
               total: mg==null? null : (our-mkt)+mg});
   });
+  // 여력 순위 (1위 = 단가를 가장 더 얹을 수 있는 상품)
+  const ranked=out.filter(r=>r.total!=null).slice().sort((a,b)=>b.total-a.total);
+  ranked.forEach((r,k)=>r.rank=k+1);
+  if(hdSort==='product') return out;      // 수수료표와 같은 상품 순서
   out.sort((a,b)=>{
     if(a.total==null&&b.total==null) return b.diff-a.diff;
     if(a.total==null) return 1;
@@ -4435,6 +4451,8 @@ function hdRows(){
   return out;
 }
 
+let hdSort=(()=>{ try{ return localStorage.getItem('sky_hdSort')||'product'; }catch(e){ return 'product'; } })();
+function setHdSort(v){ hdSort=v; try{ localStorage.setItem('sky_hdSort',v); }catch(e){} renderHeadroom(); }
 function renderHeadroom(){
   const wrap=document.getElementById('hd-wrap'); if(!wrap) return;
   const rows=hdRows();
@@ -4447,11 +4465,19 @@ function renderHeadroom(){
   const noFee=rows.filter(r=>r.total==null).length;
   if(note) note.textContent = rows.length+'개 상품'+(noFee?(' · '+noFee+'개는 월요금 미입력'):'');
 
-  let h='<table class="t"><thead><tr>'
-      + '<th class="stick">상품</th><th class="n">우리 수수료</th><th class="n">시장가</th>'
-      + '<th class="n">차액</th><th class="n">관리수수료</th><th class="n">총여력</th><th>판단</th>'
+  // 상품 순일 때는 수수료표처럼 구분·TV 칸을 묶는다
+  const grp=hdSort==='product';
+  const span=(k,i)=>{ if(!grp) return 1; if(i>0&&k(rows[i-1])===k(rows[i])) return 0;
+                      let n=1; while(i+n<rows.length&&k(rows[i+n])===k(rows[i])) n++; return n; };
+  const kSec=r=>r.sec+'|'+r.cat, kTv=r=>r.sec+'|'+r.cat+'|'+r.tv;
+  let h='<div class="hd-sort pills sm"><button class="'+(grp?'on':'')+'" onclick="setHdSort(\'product\')">상품 순</button>'
+      + '<button class="'+(grp?'':'on')+'" onclick="setHdSort(\'rank\')">여력 순</button></div>'
+      + '<div class="tw" style="max-height:none"><table class="t hd-t'+(grp?'':' rk')+'"><thead><tr>'
+      + '<th>대분류</th><th>구분</th><th>TV</th><th>인터넷</th>'
+      + '<th class="n gl2">우리 수수료</th><th class="n">시장가</th>'
+      + '<th class="n">차액</th><th class="n">관리수수료</th><th class="n">총여력</th><th class="n">순위</th><th>판단</th>'
       + '</tr></thead><tbody>';
-  rows.forEach(r=>{
+  rows.forEach((r,i)=>{
     let badge='<span class="dim small">월요금 필요</span>';
     if(r.total!=null){
       badge = r.total>=50000 ? '<span class="badge green">여유 있음</span>'
@@ -4459,17 +4485,22 @@ function renderHeadroom(){
             : r.total>=-30000? '<span class="badge amber">빠듯</span>'
             :                  '<span class="badge red">넘기는 게 낫다</span>';
     }
-    h+='<tr'+(r.total!=null&&r.total<-30000?' class="flag"':'')+'>'
-     + '<td class="stick">'+r.label+'</td>'
-     + '<td class="n">'+fmtN(r.our)+'</td>'
+    const sS=span(kSec,i), sT=span(kTv,i);
+    const top=grp&&(i===0||kSec(rows[i-1])!==kSec(r));
+    h+='<tr class="'+(r.total!=null&&r.total<-30000?'flag':'')+(top&&i>0?' gtop':'')+'">'
+     + (sS? '<td class="hd-k" rowspan="'+sS+'">'+esc(r.sec)+'</td><td class="hd-k" rowspan="'+sS+'">'+esc(r.cat)+'</td>':'')
+     + (sT? '<td class="hd-k" rowspan="'+sT+'">'+esc(r.tv||'—')+'</td>':'')
+     + '<td class="hd-in">'+esc(r.inn)+'</td>'
+     + '<td class="n gl2">'+fmtN(r.our)+'</td>'
      + '<td class="n">'+fmtN(r.mkt)+'</td>'
      + '<td class="n"><span class="'+(r.diff>=0?'cp':'cn')+'">'+(r.diff>0?'+':'')+fmtN(r.diff)+'</span></td>'
      + '<td class="n">'+(r.mg==null?'<span class="dim">—</span>':fmtN(r.mg))+'</td>'
      + '<td class="n">'+(r.total==null?'<span class="dim">—</span>'
          :'<b class="'+(r.total>=0?'cp':'cn')+'">'+(r.total>0?'+':'')+fmtN(r.total)+'</b>')+'</td>'
+     + '<td class="n">'+(r.rank? '<span class="hd-rank'+(r.rank<=3?' hd-top':'')+'">'+r.rank+'</span>':'<span class="dim">—</span>')+'</td>'
      + '<td>'+badge+'</td></tr>';
   });
-  wrap.innerHTML=h+'</tbody></table>';
+  wrap.innerHTML=h+'</tbody></table></div>';
 }
 
 // ══════════════════════════════════════════════════════════════
