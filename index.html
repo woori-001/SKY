@@ -3292,7 +3292,7 @@ const PSUB={
   rsum :'월말 확정값을 넣으면 나머지는 전부 계산됩니다',
   rgrade:'월초에 잡았던 목표 대비 실제로 어디까지 갔나',
   rgoal:'구간 · 달성률 · 100% 로 깔아둔 단가 대비 터진 금액',
-  rpl  :'정산 수령액 − 하부점 지급액 = 마진',
+  rpl  :'정산 수령액 − 하부점 지급액 + 예상 관리수수료 = 실마진',
   rwhy :'상품 믹스 · 시장가 · 상부별 단가',
   product:'상품별 월요금과 거기서 나오는 관리수수료'
 };
@@ -4027,6 +4027,32 @@ function gradeBurst(r){
   return {sIN, sTV, plan, inU, tvU, aIN:aIN||0, aTV:aTV||0, laid, fIN, fTV, reach, paid, fromRecv: rg!=null, burst: paid-laid};
 }
 
+/* ── 예상 관리수수료 (코드실적 계산기와 같은 규칙) ─────────────
+   SKYLIFE 회선당 매달 인터넷 950원 · TV 400원이 28개월 동안 들어온다.
+   건수는 어드민 정산자료를 올렸으면 그 행 수(추가단말 포함 — 단말마다 나온다),
+   아니면 실적 칸 값을 쓴다. 단가·개월은 설정에서 바꿀 수 있다. */
+const RP_MGMT_DEF={internet:950, tv:400, months:28};
+function rpMgmtRule(){ const r=(SKY.settings&&SKY.settings.mgmt_flat)||{}; return {internet:+r.internet||RP_MGMT_DEF.internet, tv:+r.tv||RP_MGMT_DEF.tv, months:+r.months||RP_MGMT_DEF.months}; }
+function rpMgmt(ym, r){
+  const st=SKY.settings&&SKY.settings['settle:'+(ym||curMonthKey())];
+  const up=st&&st.up;
+  const net = up&&up.net!=null? up.net : (r? r.actual_in : actualIN);
+  const tv  = up&&up.tvRows!=null? up.tvRows : (r? r.actual_tv : actualTV);
+  if(net==null&&tv==null) return null;
+  const R=rpMgmtRule();
+  const mi=(net||0)*R.internet*R.months, mt=(tv||0)*R.tv*R.months;
+  return {net:net||0, tv:tv||0, mi, mt, total:mi+mt, rule:R, fromFile: !!(up&&up.tvRows!=null)};
+}
+function rpSetMgmt(){
+  if(!requireEdit()) return;
+  const R=rpMgmtRule();
+  const v=prompt('예상 관리수수료 기준 (인터넷 월, TV 월, 개월) — 쉼표로 구분\n예: 950, 400, 28', R.internet+', '+R.tv+', '+R.months);
+  if(v==null) return;
+  const a=v.split(/[,\s]+/).map(x=>parseInt(x.replace(/[^\d]/g,''))).filter(n=>!isNaN(n));
+  if(a.length<3){ alert('세 숫자를 쉼표로 넣어 주세요 (예: 950, 400, 28)'); return; }
+  sbSaveSetting('mgmt_flat',{internet:a[0],tv:a[1],months:a[2]}).then(ok=>{ if(ok){ showSaved(); initReport(); } });
+}
+
 /* ── 손익 ────────────────────────────────────────────────── */
 function rpPL(){
   const cnt=(actualIN||0)+(actualTV||0);
@@ -4034,7 +4060,10 @@ function rpPL(){
   const burstGoal=['in','tv'].reduce((s,k)=>{ const c=glCalc(k); return s+(c?c.burst:0); },0);
   const gb=gradeBurst(), burstGrade=gb? gb.burst : 0;
   const burst=burstGoal+burstGrade;
-  return {recvTotal, paidSub, margin, cnt, burst, burstGoal, burstGrade, gb, recvGrade, recvGoal,
+  const mg=rpMgmt();
+  const real=(margin!=null)? margin+(mg?mg.total:0) : null;      // 실예상수익 = 정산 마진 + 예상 관리수수료
+  return {recvTotal, paidSub, margin, mg, real, cnt, burst, burstGoal, burstGrade, gb, recvGrade, recvGoal,
+          realPer:(real!=null&&cnt)? Math.round(real/cnt):null,
           perCase:(margin!=null&&cnt)? Math.round(margin/cnt):null,
           rate:(margin!=null&&recvTotal)? Math.round(margin/recvTotal*1000)/10:null,
           other:(recvTotal!=null)? recvTotal-(recvGrade||0)-(recvGoal||0):null};
@@ -4070,9 +4099,9 @@ function renderRSum(){
           gt? fmtN(gt.actual)+'건 / '+fmtN(gt.goal)+'건'+vsPrev(gt.rate, ps&&ps.gt&&ps.gt.rate,'%'):'')
     + kpi('c3','터진 금액','<span class="'+rpCls(pl.burst)+'">'+(pl.burst?rpSign(pl.burst):'0원')+'</span>',
           '목표달성 '+rpSign(pl.burstGoal||0)+' · 그레이드 '+rpSign(pl.burstGrade||0)+vsPrev(pl.burst||0, ps&&ps.hasGoal? ps.burst:null))
-    + kpi('c4','실마진', pl.margin!=null?'<span class="'+rpCls(pl.margin)+'">'+rpSign(pl.margin)+'</span>':'—',
-          pl.perCase!=null? ('건당 '+fmtN(pl.perCase)+'원'+vsPrev(pl.margin, ps&&ps.margin))
-                          : '정산 수령액과 지급액을 넣어주세요');
+    + kpi('c4','실마진', pl.real!=null?'<span class="'+rpCls(pl.real)+'">'+rpSign(pl.real)+'</span>':'—',
+          pl.real!=null? ('정산 마진 '+rpSign(pl.margin)+' + 예상 관리수수료 '+rpSign(pl.mg?pl.mg.total:0)+vsPrev(pl.real, ps&&ps.margin))
+                       : '정산 수령액과 지급액을 넣어주세요');
 
   // 회의에서 그대로 읽을 수 있는 한 줄 정리
   const L=[];
@@ -4099,8 +4128,8 @@ function renderRSum(){
           +'%) 이었습니다. 전부 일반이었다면 <b>'+fmtN(mx.lost)+'원</b>을 더 받았습니다']);
   });
   if(pl.margin!=null)
-    L.push([pl.margin>=0?'ok':'bad','정산 '+rpWon(pl.recvTotal)+' − 하부점 '+rpWon(pl.paidSub)
-          +' = 마진 <b>'+rpSign(pl.margin)+'</b>']);
+    L.push([pl.real>=0?'ok':'bad','정산 '+rpWon(pl.recvTotal)+' − 하부점 '+rpWon(pl.paidSub)
+          +' = 마진 '+rpSign(pl.margin)+(pl.mg? ' + 예상 관리수수료 '+rpSign(pl.mg.total):'')+' = 실마진 <b>'+rpSign(pl.real)+'</b>']);
 
   const C={ok:'green',warn:'amber',bad:'red'}, N={ok:'양호',warn:'확인',bad:'손실'};
   const box=document.getElementById('rs-lines');
@@ -4170,17 +4199,21 @@ function renderRPL(){
    + ((pl.other!=null && (pl.recvGrade!=null||pl.recvGoal!=null))
         ? row('<span class="dim">└ 그 밖의 정책</span>','<span class="dim">'+rpWon(pl.other)+'</span>'):'')
    + row('하부점 지급액','− '+rpWon(pl.paidSub))
-   + row('마진', rpSign(pl.margin), rpCls(pl.margin), true)
-   + (pl.cnt? row('건당 마진', pl.perCase!=null? rpWon(pl.perCase):'—'):'')
+   + row('정산 마진', rpSign(pl.margin), rpCls(pl.margin))
+   + (pl.mg? row('예상 관리수수료 <span class="dim">(인터넷 '+fmtN(pl.mg.net)+'×'+fmtN(pl.mg.rule.internet)+' + TV '+fmtN(pl.mg.tv)+'×'+fmtN(pl.mg.rule.tv)
+        +') × '+pl.mg.rule.months+'개월'+(pl.mg.fromFile?' · 정산자료 건수':' · 실적 칸 건수')+'</span>'
+        +(canEdit()?' <button class="ghost sm" style="padding:2px 8px" onclick="rpSetMgmt()">기준</button>':''), '+ '+rpWon(pl.mg.total)) : '')
+   + row('실마진 <span class="dim">(실예상수익)</span>', rpSign(pl.real), rpCls(pl.real), true)
+   + (pl.cnt? row('건당 실마진', pl.realPer!=null? rpWon(pl.realPer):'—'):'')
    + (pl.rate!=null? row('수령액 대비', pl.rate+'%'):'')
    + '</tbody></table></div></div>';
 
   h+='<div class="card"><div class="card-h"><h2>목표를 채웠다면</h2></div>'
    + '<div class="tw"><table class="t"><tbody>'
-   + row('지금 마진', rpSign(pl.margin), rpCls(pl.margin))
+   + row('지금 실마진', rpSign(pl.real), rpCls(pl.real))
    + row('터진 금액 <span class="dim">(목표달성 '+rpSign(pl.burstGoal)+' · 그레이드 '+rpSign(pl.burstGrade)+')</span>', rpSign(pl.burst), rpCls(pl.burst))
-   + row('목표대로 됐다면', pl.margin!=null? rpSign(pl.margin-pl.burst):'—',
-         rpCls(pl.margin!=null? pl.margin-pl.burst : null), true)
+   + row('목표대로 됐다면', pl.real!=null? rpSign(pl.real-pl.burst):'—',
+         rpCls(pl.real!=null? pl.real-pl.burst : null), true)
    + '</tbody></table></div>'
    + '<div class="foot-note"><span>터진 금액은 이미 하부점에 나간 뒤라 회수할 수 없습니다. '
    + '다음 달 단가를 짤 때 목표달성을 100% 로 깔지, 한 구간 낮춰 깔지를 여기서 정하세요.</span></div></div>';
@@ -4321,7 +4354,9 @@ function rpSections(){
           ['마진',(pl.margin>0?'+':'')+fmtN(pl.margin)+'원'],
           ...(pl.perCase!=null? [['건당 마진', fmtN(pl.perCase)+'원']]:[]),
           ['터진 금액 (목표달성 '+fmtN(pl.burstGoal)+' · 그레이드 '+fmtN(pl.burstGrade)+')', fmtN(pl.burst)+'원'],
-          ['목표대로 됐다면',(pl.margin-pl.burst>0?'+':'')+fmtN(pl.margin-pl.burst)+'원']]});
+          ['예상 관리수수료', fmtN(pl.mg?pl.mg.total:0)+'원'],
+          ['실마진', fmtN(pl.real)+'원'],
+          ['목표대로 됐다면',(pl.real-pl.burst>0?'+':'')+fmtN(pl.real-pl.burst)+'원']]});
 
   const mx=[];
   [['인터넷',rpMix('in')],['TV',rpMix('tv')]].forEach(([lab,m])=>{
@@ -4986,7 +5021,9 @@ function rowTotalFor(st, ri, gu){
 function monthSummary(ym){
   const st=stOf(ym); if(!st) return null;
   const r=st.row, gi=glCalc('in',r), gt=glCalc('tv',r);
-  const margin=(r.recv_total!=null&&r.paid_sub!=null)? r.recv_total-r.paid_sub : null;
+  const m0=(r.recv_total!=null&&r.paid_sub!=null)? r.recv_total-r.paid_sub : null;
+  const mg=rpMgmt(ym, r);
+  const margin=m0!=null? m0+(mg?mg.total:0) : null;          // 실마진 (관리수수료 포함)
   const cnt=(r.actual_in||0)+(r.actual_tv||0);
   const chk=r.pol_checked||{};
   return {ym, st, gi, gt,
@@ -5021,15 +5058,15 @@ function historyTrendHtml(list){
     + kpiBox('c2','평균 달성률', aIN==null? '—' : aIN.toFixed(1)+'<small>%</small>',
              aIN==null? '실적·목표를 넣은 달이 없습니다' : '인터넷 '+aIN.toFixed(1)+'% · TV '+(aTV==null?'—':aTV.toFixed(1)+'%'))
     + kpiBox('c3','누적 터진 금액', withGoal.length? '<span class="'+rpCls(sumB)+'">'+rpSign(sumB)+'</span>':'—', withGoal.length+'개월 합')
-    + kpiBox('c4','누적 마진', withM.length? '<span class="'+rpCls(sumM)+'">'+rpSign(sumM)+'</span>':'—',
+    + kpiBox('c4','누적 실마진', withM.length? '<span class="'+rpCls(sumM)+'">'+rpSign(sumM)+'</span>':'—',
              withM.length? withM.length+'개월 합 · 월평균 '+rpSign(Math.round(sumM/withM.length)) : '정산값을 넣은 달이 없습니다')
     + '</div>';
 
   if(withM.length>=1 || withGoal.length>=1){
     const vals=S.map(x=>x.margin);
     const mx=Math.max(1,...vals.filter(v=>v!=null).map(Math.abs));
-    h+='<div class="card"><div class="card-h"><h2><span class="ib c4">'+ICO.chart+'</span>월별 마진</h2>'
-     + '<span class="hint">정산 수령액 − 하부점 지급액</span></div><div class="cbars"><div class="cb-g">'
+    h+='<div class="card"><div class="card-h"><h2><span class="ib c4">'+ICO.chart+'</span>월별 실마진</h2>'
+     + '<span class="hint">정산 수령액 − 하부점 지급액 + 예상 관리수수료</span></div><div class="cbars"><div class="cb-g">'
      + S.map(x=>{
          const v=x.margin, ht=v==null?0:Math.max(4,Math.round(Math.abs(v)/mx*100));
          return '<div class="cb'+(x.ym===cur?' on':'')+'" onclick="jumpMonth(\''+x.ym+'\')" title="'+ymLabel(x.ym)+'">'
@@ -5045,7 +5082,7 @@ function historyTrendHtml(list){
    + '<div class="tw"><table class="t"><thead><tr>'
    + '<th class="stick">정책월</th><th class="n">정책</th><th class="n">그레이드 목표</th>'
    + '<th>인터넷 달성률</th><th>TV 달성률</th><th class="n">터진 금액</th>'
-   + '<th class="n">정산 수령</th><th class="n">마진</th><th class="n">건당 마진</th><th>상태</th>'
+   + '<th class="n">정산 수령</th><th class="n">실마진</th><th class="n">건당 실마진</th><th>상태</th>'
    + '</tr></thead><tbody>'
    + S.slice().reverse().map(x=>{
        const r=x.st.row;
@@ -5465,7 +5502,7 @@ function settleApply(){
   // 어떤 파일로 계산했는지 남겨 둔다
   const ym=curMonthKey();
   sbSaveSetting('settle:'+ym, {at:new Date().toISOString(), by:(sbUser&&sbUser.email)||'',
-    up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,month:R.up.month&&R.up.month.open},
+    up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,tvRows:R.up.tv+R.up.tvAddHome,month:R.up.month&&R.up.month.open},
     all:R.all&&{file:R.all.file,paid:R.all.paid,margin:SETTLE.addMargin?R.all.margin:0,rows:R.all.rows,month:R.all.month&&R.all.month.open}})
     .then(()=>{ const sn=document.getElementById('settle-note'); if(sn) sn.innerHTML=settleNoteHtml(); });
   closeModal(); initReport(); renderSideInfo();
