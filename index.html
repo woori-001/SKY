@@ -5261,27 +5261,42 @@ function sPick(rows){
   });
   return {hit, ex, drop};
 }
+/* 개통월 : 어드민에서 '개통일' 기준으로 받은 자료라 개통일의 달을 쓴다.
+   (개통일 열이 없을 때만 정산예정일 - 1달) */
 function sMonthOf(rows){
-  const c={};
-  rows.forEach(r=>{ const m=String(r['정산예정일']||'').match(/(\d{4})[-.\/](\d{1,2})/); if(m){ const k=m[1]+'-'+('0'+m[2]).slice(-2); c[k]=(c[k]||0)+1; } });
-  let best='',n=0; Object.keys(c).forEach(k=>{ if(c[k]>n){n=c[k];best=k;} }); return best;
+  const tally=(col)=>{ const c={}; rows.forEach(r=>{ const m=String(r[col]||'').match(/(\d{4})[-.\/](\d{1,2})/); if(m){ const k=m[1]+'-'+('0'+m[2]).slice(-2); c[k]=(c[k]||0)+1; } });
+    let best='',n=0; Object.keys(c).forEach(k=>{ if(c[k]>n){n=c[k];best=k;} }); return {best, months:Object.keys(c).sort()}; };
+  const o=tally('개통일');
+  if(o.best) return {open:o.best, months:o.months, by:'개통일'};
+  const s=tally('정산예정일');
+  return {open:prevYm(s.best), months:s.months.map(prevYm), by:'정산예정일'};
 }
 function settleCompute(){
   const up=SETTLE.files.up, all=SETTLE.files.all;
   const R={up:null, all:null};
   if(up){
     const p=sPick(up.rows);
-    const by={}; let net=0, tv=0, home=0, homeTv=0, grade=0, goal=0;
+    const by={}; let net=0, tv=0, home=0, homeTv=0, grade=0, goal=0, tvAdd=0, tvSolo=0, tvAddHome=0;
+    // 홈30% 세트(같은 고객)에 붙은 추가단말은 실적에서 뺀다
+    const isHomeRow=r=>/홈\s*30|30%|홈결합/.test(String(r['상품옵션']||'')+' '+String(r['상품명']||''));
+    const homeCust=new Set(p.hit.filter(isHomeRow).map(r=>sKey(r['상부점'])+'|'+sKey(r['고객명'])));
     p.hit.forEach(r=>{
-      const pn=r['상품명']||'(공백)', amt=sNum(r['정산금액']), k=sClassify(pn);
-      by[pn]=by[pn]||{cnt:0,amt:0,k}; by[pn].cnt++; by[pn].amt+=amt;
-      if(k==='internet'){ net++; if(/30%|홈결합/.test(pn)) home++; }
-      if(k==='tv'){ tv++; if(/30%|홈결합/.test(pn)) homeTv++; }
+      const pn=r['상품명']||'(공백)', opt=String(r['상품옵션']||''), amt=sNum(r['정산금액']), k=sClassify(pn);
+      const lab=pn+(opt?' · '+opt:'');
+      by[lab]=by[lab]||{cnt:0,amt:0,k}; by[lab].cnt++; by[lab].amt+=amt;
+      const isHome=/홈\s*30|30%|홈결합/.test(opt+' '+pn);
+      if(k==='internet'){ net++; if(isHome) home++; }
+      if(k==='tv'){
+        const add=/추단/.test(opt);
+        if(add && homeCust.has(sKey(r['상부점'])+'|'+sKey(r['고객명']))){ tvAddHome++; }   // 홈30% 세트의 추가단말 → 제외
+        else { tv++; if(isHome) homeTv++; if(add) tvAdd++; if(/단독/.test(opt)) tvSolo++; }
+      }
       if(/그레이드/.test(pn)) grade+=amt;
       if(/목표/.test(pn)) goal+=amt;
     });
+    const pickedAll=up.rows.filter(r=>sKey(r['상부점'])===sKey(SETTLE.lineCode));
     R.up={file:up.name, rows:p.hit.length, total:p.hit.reduce((a,r)=>a+sNum(r['정산금액']),0),
-          net, tv, home, homeTv, grade, goal, by, ex:p.ex, drop:p.drop, month:sMonthOf(up.rows)};
+          net, tv, home, homeTv, tvAdd, tvSolo, tvAddHome, grade, goal, by, ex:p.ex, drop:p.drop, month:sMonthOf(pickedAll)};
   }
   if(all){
     const p=sPick(all.rows);
@@ -5290,7 +5305,8 @@ function settleCompute(){
     const byP={};
     p.hit.forEach(r=>{ const k=String(r['협력점']||'(공백)').trim(); byP[k]=byP[k]||{cnt:0,amt:0}; byP[k].cnt++; byP[k].amt+=Math.max(0,sNum(r['약정금액'])); });
     R.all={file:all.name, rows:p.hit.length, paid:pos.reduce((a,r)=>a+sNum(r['약정금액']),0),
-           margin:team.length*SETTLE.marginPerNet, marginCnt:team.length, byP, ex:p.ex, drop:p.drop, month:sMonthOf(all.rows)};
+           margin:team.length*SETTLE.marginPerNet, marginCnt:team.length, byP, ex:p.ex, drop:p.drop,
+           month:sMonthOf(all.rows.filter(r=>sKey(r['상부점'])===sKey(SETTLE.lineCode)))};
   }
   SETTLE.result=R;
   return R;
@@ -5334,13 +5350,17 @@ function settleRender(){
   const out=document.getElementById('sd-out'); if(!out) return;
   const keep={}; out.querySelectorAll('input[type=checkbox][id^="sa-"]').forEach(c=>keep[c.id]=c.checked);   // 다시 그려도 고른 상태 유지
   const R=settleCompute(), ym=curMonthKey();
-  const m=R.up? R.up.month : R.all? R.all.month : '';
-  const openYm=prevYm(m);
+  const M=(R.up&&R.up.month)||(R.all&&R.all.month)||null;
+  const openYm=M&&M.open;
   let h='';
-  if(m) h+='<div class="foot-note" style="margin-top:14px'+(openYm!==ym?';background:var(--amber-w);color:#8a4b06':'')+'"><span>'
-      + '정산예정일 <b>'+ymLabel(m)+'</b> 자료 → 개통월 <b>'+ymLabel(openYm)+'</b>'
-      + (openYm!==ym? ' · <b>지금 보는 달('+ymLabel(ym)+')과 다릅니다.</b> 달을 바꾼 뒤 다시 올리거나, 그대로 반영하면 '+ymLabel(ym)+'에 들어갑니다.':' · 지금 보는 달과 맞습니다.')
+  if(openYm){
+    const multi=M.months.length>1;
+    h+='<div class="foot-note" style="margin-top:14px'+(openYm!==ym||multi?';background:var(--amber-w);color:#8a4b06':'')+'"><span>'
+      + M.by+' 기준 <b>'+ymLabel(openYm)+'</b> 개통분'
+      + (multi? ' · <b>여러 달이 섞여 있습니다 ('+M.months.map(ymLabel).join(', ')+')</b> — 개통일로 한 달만 받아 주세요':'')
+      + (openYm!==ym? ' · <b>지금 보는 달('+ymLabel(ym)+')과 다릅니다.</b> 그대로 반영하면 '+ymLabel(ym)+'에 들어갑니다.':' · 지금 보는 달과 맞습니다.')
       + '</span></div>';
+  }
   const cur=(v)=>v==null?'<span class="dim">비어 있음</span>':fmtN(v);
   const line=(id,label,now,val,on,note)=>'<tr><td><label class="chk"><input type="checkbox" id="'+id+'" '+((id in keep? keep[id] : on)?'checked':'')+'> '+label+'</label>'
       +(note?'<div class="dim small">'+note+'</div>':'')+'</td><td class="n">'+cur(now)+'</td><td class="n"><b>'+fmtN(val)+'</b></td></tr>';
@@ -5350,10 +5370,12 @@ function settleRender(){
     if(R.up.grade) rows+=line('sa-rg','그중 그레이드', recvGrade, R.up.grade, true, "상품명에 '그레이드'가 있는 행");
     if(R.up.goal)  rows+=line('sa-rl','그중 목표달성', recvGoal, R.up.goal, true, "상품명에 '목표'가 있는 행");
     rows+=line('sa-ain','실적 인터넷', actualIN, R.up.net, actualIN==null, '인터넷 상품 행 수 (인터넷전화 제외)');
-    rows+=line('sa-atv','실적 TV', actualTV, R.up.tv, actualTV==null, 'TV 상품 행 수 (CCTV 제외)');
+    rows+=line('sa-atv','실적 TV', actualTV, R.up.tv, actualTV==null, 'TV 상품 행 수'
+      +(R.up.tvAddHome? ' · 홈30% 세트의 추가단말 '+R.up.tvAddHome+'건 제외':'')
+      +(R.up.tvAdd||R.up.tvSolo? ' · 추가단말 '+R.up.tvAdd+'건 · 단독 '+R.up.tvSolo+'건 포함':''));
     if(R.up.home||R.up.homeTv){
-      rows+=line('sa-min','그중 30%홈결합 인터넷', mix30IN, R.up.home, mix30IN==null, "상품명에 '30%' 또는 '홈결합'");
-      rows+=line('sa-mtv','그중 30%홈결합 TV', mix30TV, R.up.homeTv, mix30TV==null, "상품명에 '30%' 또는 '홈결합'");
+      rows+=line('sa-min','그중 30%홈결합 인터넷', mix30IN, R.up.home, mix30IN==null, "상품옵션에 '홈30%'");
+      rows+=line('sa-mtv','그중 30%홈결합 TV', mix30TV, R.up.homeTv, mix30TV==null, "상품옵션에 '홈30%'");
     }
   }
   if(R.all){
@@ -5366,7 +5388,7 @@ function settleRender(){
   // 확인용 내역
   if(R.up){
     const list=Object.entries(R.up.by).sort((a,b)=>b[1].amt-a[1].amt);
-    h+='<details class="migr" style="margin-top:12px"><summary>상부정산 상품별 내역 ('+list.length+'종)</summary><div class="tw" style="margin-top:8px;max-height:260px"><table class="t sm"><thead><tr><th>상품명</th><th>분류</th><th class="n">건수</th><th class="n">정산금액</th></tr></thead><tbody>'
+    h+='<details class="migr" style="margin-top:12px"><summary>상부정산 상품별 내역 ('+list.length+'종)</summary><div class="tw" style="margin-top:8px;max-height:260px"><table class="t sm"><thead><tr><th>상품명 · 상품옵션</th><th>분류</th><th class="n">건수</th><th class="n">정산금액</th></tr></thead><tbody>'
       + list.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+({internet:'인터넷',tv:'TV',extra:'부가상품',cctv:'CCTV',voip:'인터넷전화',phone:'일반전화',etc:'기타'}[v.k])+'</td><td class="n">'+fmtN(v.cnt)+'</td><td class="n">'+fmtN(v.amt)+'</td></tr>').join('')
       + '</tbody></table></div>'+settleExHtml(R.up)+'</details>';
   }
@@ -5409,8 +5431,9 @@ function settleApply(){
   // 어떤 파일로 계산했는지 남겨 둔다
   const ym=curMonthKey();
   sbSaveSetting('settle:'+ym, {at:new Date().toISOString(), by:(sbUser&&sbUser.email)||'',
-    up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,month:R.up.month},
-    all:R.all&&{file:R.all.file,paid:R.all.paid,margin:SETTLE.addMargin?R.all.margin:0,rows:R.all.rows,month:R.all.month}});
+    up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,month:R.up.month&&R.up.month.open},
+    all:R.all&&{file:R.all.file,paid:R.all.paid,margin:SETTLE.addMargin?R.all.margin:0,rows:R.all.rows,month:R.all.month&&R.all.month.open}})
+    .then(()=>{ const sn=document.getElementById('settle-note'); if(sn) sn.innerHTML=settleNoteHtml(); });
   closeModal(); initReport(); renderSideInfo();
   showGsStatus(ymLabel(ym)+' 정산자료를 반영했습니다');
 }
