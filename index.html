@@ -1371,10 +1371,10 @@ function renderAuthUI(){
     btn.title     = sbUser ? '로그아웃' : '로그인';
     btn.classList.toggle('out', !!sbUser);
   }
-  if(av) av.textContent = sbUser ? String(sbUser.email||'?').charAt(0).toUpperCase() : '?';
+  if(av) av.textContent = sbUser ? String(userLabel(sbUser)||'?').charAt(0).toUpperCase() : '?';
   if(who){
-    who.textContent = sbUser ? sbUser.email : '읽기 전용';
-    who.title = sbUser ? sbUser.email : '';
+    who.textContent = sbUser ? userLabel(sbUser) : '읽기 전용';
+    who.title = sbUser ? userLabel(sbUser) : '';
   }
   if(sub){
     sub.textContent = !sbUser  ? '로그인하면 수정할 수 있습니다'
@@ -1452,10 +1452,14 @@ function rerenderForAuth(){
   }catch(e){ console.warn(e); }
 }
 
+// 웹 전용 아이디(@ 없는 이름)는 내부 주소로 바꿔 로그인한다 : admin → admin@sky.local
+const SKY_ID_DOMAIN='@sky.local';
+function loginIdToEmail(id){ id=String(id||'').trim(); return id.includes('@')? id : (id.toLowerCase()+SKY_ID_DOMAIN); }
+function userLabel(u){ const e=(u&&u.email)||''; return e.endsWith(SKY_ID_DOMAIN)? e.slice(0,-SKY_ID_DOMAIN.length) : e; }
 async function sbSignIn(email, pw){
   if(!sb) return {ok:false,msg:'서버에 연결되지 않았습니다'};
-  const {error}=await sb.auth.signInWithPassword({email:email.trim(), password:pw});
-  if(error) return {ok:false, msg:error.message};
+  const {error}=await sb.auth.signInWithPassword({email:loginIdToEmail(email), password:pw});
+  if(error) return {ok:false, msg:/invalid login/i.test(error.message)?'아이디 또는 비밀번호가 맞지 않습니다':error.message};
   const {data:{session}}=await sb.auth.getSession();
   sbUser = session ? session.user : null;
   await refreshAdmin();
@@ -1598,7 +1602,7 @@ async function sbSaveMonth(){
       recv_goal : recvGoal,  paid_sub  : paidSub,
       copied_from: copiedFrom, pol_checked: polChecked,
       review_memo : reviewMemo||'',
-      updated_by: (sbUser&&sbUser.email)||''
+      updated_by: userLabel(sbUser)
     };
     const {data:saved,error}=await sb.from('sky_months').upsert(row,{onConflict:'month'}).select('version,updated_at').single();
     if(error) throw error;
@@ -1664,7 +1668,7 @@ async function sbLoadSettings(){
 async function sbSaveSetting(key, value){
   if(!sb||!canEdit()) return false;
   const {error}=await sb.from('sky_settings')
-    .upsert({key, value, updated_by:(sbUser&&sbUser.email)||''},{onConflict:'key'});
+    .upsert({key, value, updated_by:userLabel(sbUser)},{onConflict:'key'});
   if(error){ console.warn('설정 저장 실패',error); return false; }
   SKY.settings[key]=value;
   return true;
@@ -1688,7 +1692,7 @@ async function sbAddCompareSource(name){
   if(!sb||!canEdit()) return false;
   const pos=(SKY.cmpSrc.length?Math.max(...SKY.cmpSrc.map(s=>s.pos)):0)+1;
   const {error}=await sb.from('sky_compare_sources')
-    .insert({name,pos,updated_by:(sbUser&&sbUser.email)||''});
+    .insert({name,pos,updated_by:userLabel(sbUser)});
   if(error){ alert('칸 추가 실패: '+error.message); return false; }
   try{ await sbLoadCompare(curMonthKey()); }catch(e){ showGsStatus('⚠ '+e.message,false); }   // 서버 기준으로 목록 다시 읽기
   return true;
@@ -1722,7 +1726,7 @@ async function sbSaveCompareNow(){
   if(!SKY.cmpLoaded){ showGsStatus('⚠ 상부 비교값을 불러오지 못한 상태라 저장하지 않았습니다 — 새로고침하세요',false); return false; }
   const ids=[..._cmpDirty].filter(id=>SKY.cmpSrc.some(s=>s.id===id));
   if(!ids.length){ _cmpDirty.clear(); return true; }
-  const rows=ids.map(id=>({source_id:id, month:ym, vals:SKY.cmpVals[id]||{}, updated_by:(sbUser&&sbUser.email)||''}));
+  const rows=ids.map(id=>({source_id:id, month:ym, vals:SKY.cmpVals[id]||{}, updated_by:userLabel(sbUser)}));
   const {error}=await sb.from('sky_compare_values').upsert(rows,{onConflict:'source_id,month'});
   if(error){ setSyncDot('error','저장 실패'); showGsStatus('⚠ 저장 실패 — '+error.message,false); return false; }
   ids.forEach(id=>_cmpDirty.delete(id));
@@ -3421,7 +3425,7 @@ function openLoginBox(){
   box.innerHTML='<form class="lcard" autocomplete="on">'
     + (logo? '<div class="lbrand"><img src="'+logo+'" alt="skylife"></div>':'')
     + '<h2>SKY 코드운영</h2><p class="sub">관리자로 로그인하면 수수료표를 고칠 수 있습니다.</p>'
-    + '<label>이메일<input id="lg-email" type="email" autocomplete="username"></label>'
+    + '<label>아이디<input id="lg-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></label>'
     + '<label>비밀번호<input id="lg-pw" type="password" autocomplete="current-password"></label>'
     + '<p class="lerr" id="lg-err"></p>'
     + '<button class="primary lbtn" id="lg-go" type="submit">로그인</button>'
@@ -3434,7 +3438,7 @@ function openLoginBox(){
   box.querySelector('form').onsubmit=async e=>{
     e.preventDefault();
     const em=box.querySelector('#lg-email').value, pw=box.querySelector('#lg-pw').value;
-    if(!em||!pw){ err.textContent='이메일과 비밀번호를 입력하세요'; return; }
+    if(!em||!pw){ err.textContent='아이디와 비밀번호를 입력하세요'; return; }
     err.textContent='';
     const btn=box.querySelector('#lg-go'); btn.textContent='확인 중...'; btn.disabled=true;
     const r=await sbSignIn(em,pw);
@@ -5574,7 +5578,7 @@ function settleApply(){
   autoSave();
   // 어떤 파일로 계산했는지 남겨 둔다
   const ym=curMonthKey();
-  sbSaveSetting('settle:'+ym, {at:new Date().toISOString(), by:(sbUser&&sbUser.email)||'',
+  sbSaveSetting('settle:'+ym, {at:new Date().toISOString(), by:userLabel(sbUser),
     up:R.up&&{file:R.up.file,total:R.up.total,rows:R.up.rows,net:R.up.net,tv:R.up.tv,tvRows:R.up.tv+R.up.tvAddHome,month:R.up.month&&R.up.month.open},
     all:R.all&&{file:R.all.file,paid:R.all.paid,margin:SETTLE.addMargin?R.all.margin:0,rows:R.all.rows,month:R.all.month&&R.all.month.open}})
     .then(()=>{ const sn=document.getElementById('settle-note'); if(sn) sn.innerHTML=settleNoteHtml(); });
