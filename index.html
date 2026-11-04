@@ -2581,20 +2581,21 @@ function _doImg(){
   const N=rows.length;
   function mksp(fn){const o=new Array(N).fill(0);for(let i=0;i<N;i++)if(i===0||fn(rows[i])!==fn(rows[i-1])){let s=1;while(i+s<N&&fn(rows[i+s])===fn(rows[i]))s++;o[i]=s;}return o;}
   const SS=mksp(r=>r.sec), CS=mksp(r=>r.sec+'|'+r.cat), TS=mksp(r=>r.sec+'|'+r.tv);
-  const hasSP=Object.keys(giftVals).length>0; // 상품권 입력값 있으면 컬럼 표시
+  // 상품권 스위치가 켜져 있고 입력값이 있을 때만 상품권 · 상품권 포함 칸을 그린다
+  const hasSP=!!showGift && Object.values(giftVals||{}).some(v=>+v>0);
   // 컬럼: 대분류 | 구분 | TV | 인터넷 | [상품권] | 수수료합계(제외) | 수수료합계(포함)
   const COLS=[];
-  COLS.push({w:58, lbl:'대분류'});
-  COLS.push({w:52, lbl:'구분'});
-  COLS.push({w:52, lbl:'TV'});
-  COLS.push({w:48, lbl:'인터넷'});
-  if(hasSP) COLS.push({w:72,lbl:'상품권'});
-  COLS.push({w:90,lbl:'수수료 총합\n(상품권 제외)'});
-  COLS.push({w:90,lbl:'수수료 총합\n(상품권 포함)'});
-  const I_TOT=COLS.length-2, I_INC=COLS.length-1; // 합계 컬럼 인덱스
+  COLS.push({w:56, lbl:'대분류'});
+  COLS.push({w:54, lbl:'구분'});
+  COLS.push({w:50, lbl:'TV'});
+  COLS.push({w:44, lbl:'인터넷'});
+  if(hasSP) COLS.push({w:64,lbl:'상품권'});
+  COLS.push({w:84,lbl:hasSP?'수수료 총합\n(상품권 제외)':'수수료 총합'});
+  if(hasSP) COLS.push({w:84,lbl:'수수료 총합\n(상품권 포함)'});
+  const I_TOT=hasSP? COLS.length-2 : COLS.length-1, I_INC=hasSP? COLS.length-1 : -1; // 합계 컬럼 인덱스
   const CX=[0]; COLS.forEach(c=>CX.push(CX[CX.length-1]+c.w));
   const TW=CX[COLS.length];
-  const SC=2, RH=22, TOPH=30, HDRH=24, DY=TOPH+HDRH, TH=DY+N*RH+1;
+  const SC=2, RH=17, TOPH=26, HDRH=hasSP?28:22, DY=TOPH+HDRH, TH=DY+N*RH+1;
 
   const cv=document.createElement('canvas');
   cv.width=TW*SC; cv.height=TH*SC;
@@ -2653,9 +2654,9 @@ function _doImg(){
 
   // 타이틀 바 - UI 상단 그레이드 바 참고해서 두 톤으로
   fr(0,0,TW,TOPH,'#ffffff');
-  const tw1=Math.round(TW*0.52);
-  fr(0,0,tw1,TOPH,'#f8f9fb'); tx('우리정보통신 · SKY 수수료표',0,0,tw1,TOPH,'c','#1c2230',12,true);
-  fr(tw1,0,TW-tw1,TOPH,'#edf3ff'); tx(curMonth||'',tw1,0,TW-tw1,TOPH,'c','#3a6fe6',12,true);
+  const tw1=Math.min(TW-84, Math.max(Math.round(TW*0.52), 196)); // 좁은 표(상품권 끔)에서도 제목이 잘리지 않게
+  fr(0,0,tw1,TOPH,'#f8f9fb'); tx('우리정보통신 · SKY 수수료표',0,0,tw1,TOPH,'c','#1c2230',11.5,true);
+  fr(tw1,0,TW-tw1,TOPH,'#edf3ff'); tx(curMonth||'',tw1,0,TW-tw1,TOPH,'c','#3a6fe6',11.5,true);
   ln(0,TOPH,TW,TOPH,UI.border,1);
 
   // 헤더 행 - UI thead와 동일 (파스텔톤)
@@ -2680,17 +2681,18 @@ function _doImg(){
   rows.forEach((r,i)=>{
     if(SS[i]>0)fr(CX[0],DY+i*RH,COLS[0].w,SS[i]*RH,UI.catBg);
     if(CS[i]>0)fr(CX[1],DY+i*RH,COLS[1].w,CS[i]*RH,'#f6f8fb');
+    if(TS[i]>0)fr(CX[2],DY+i*RH,COLS[2].w,TS[i]*RH,'#fbfcfe'); // 합쳐진 TV 칸은 한 색으로
   });
   // PASS C: 텍스트
   rows.forEach((r,i)=>{
     const y=DY+i*RH;
     if(SS[i]>0) tx(r.sec,CX[0],y,COLS[0].w,SS[i]*RH,'c',UI.catColor,9,true);
     if(CS[i]>0&&r.cat) tx(r.cat,CX[1],y,COLS[1].w,CS[i]*RH,'c','#374151',9,false);
-    if(TS[i]>0&&r.tv) tx(r.tv,CX[2],y,COLS[2].w,TS[i]*RH,'c',UI.tvColor,9.5,false);
-    tx(r.in||'',CX[3],y,COLS[3].w,RH,'c',UI.inColor,9.5,false);
-    if(hasSP&&r.gift>0) tx(r.gift.toLocaleString(),CX[I_TOT-1],y,COLS[I_TOT-1].w,RH,'r',UI.spColor,9.5,true);
-    if(r.total>0)    tx(r.total.toLocaleString(),   CX[I_TOT],y,COLS[I_TOT].w,RH,'r',UI.totColor,11,true);
-    if(r.totalInc>0) tx(r.totalInc.toLocaleString(),CX[I_INC],y,COLS[I_INC].w,RH,'r',UI.incColor,10.5,true);
+    if(TS[i]>0&&r.tv) tx(r.tv,CX[2],y,COLS[2].w,TS[i]*RH,'c',UI.tvColor,9,false);
+    tx(r.in||'',CX[3],y,COLS[3].w,RH,'c',UI.inColor,9,false);
+    if(hasSP&&r.gift>0) tx(r.gift.toLocaleString(),CX[I_TOT-1],y,COLS[I_TOT-1].w,RH,'r',UI.spColor,9,true);
+    if(r.total>0)    tx(r.total.toLocaleString(),   CX[I_TOT],y,COLS[I_TOT].w,RH,'r',UI.totColor,10.5,true);
+    if(hasSP&&r.totalInc>0) tx(r.totalInc.toLocaleString(),CX[I_INC],y,COLS[I_INC].w,RH,'r',UI.incColor,10,true);
     // 구분선 — rowspan 중인 컬럼 위에는 선 안 그림
     if(i>0){
       if(r.isSecNew){
@@ -2715,7 +2717,7 @@ function _doImg(){
   COLS.slice(0,-1).forEach((_,ci)=>{
     const bx=ci+1; // CX[bx] = 컬럼 bx의 왼쪽 경계
     if(bx===I_TOT)      ln(CX[bx],TOPH,CX[bx],TH,UI.totBd,2);   // 화면 .c-tot border-left 2px var(--bd)
-    else if(bx===I_INC) ln(CX[bx],TOPH,CX[bx],TH,UI.incBd,1);   // 화면 .c-tot-gift border-left 1px var(--br)
+    else if(I_INC>=0&&bx===I_INC) ln(CX[bx],TOPH,CX[bx],TH,UI.incBd,1);   // 화면 .c-tot-gift border-left 1px var(--br)
     else                ln(CX[bx],TOPH,CX[bx],TH,UI.border,0.5);
   });
 
@@ -3675,69 +3677,140 @@ function feeItemDown(gi,ii){
 
 
 // 수수료표 엑셀 저장
-function exportFeeTableToExcel(){
-  if(typeof XLSX==='undefined'){alert('XLSX 라이브러리가 없어요.');return;}
-  const activePols=policies.filter(p=>p.apply);
-
-  // 헤더 3행 (정책ID/번호/명)
-  const hRow1=['구분','카테고리','TV상품','인터넷'];
-  const hRow2=['','','',''];
-  const hRow3=['','','',''];
-  activePols.forEach(p=>{hRow1.push(p.id||'');hRow2.push(p.num||'');hRow3.push(p.name||'');});
-  hRow1.push('그레이드단가','상품권','합계(상품권 제외)','합계(상품권 포함)');
-  hRow2.push('','','','');
-  hRow3.push('','','','');
-  const wsData=[hRow1,hRow2,hRow3];
-
-  // rowGrade 계산 로직 (renderTable과 동일)
-  let curSec='';
-  ROWS.forEach((r,i)=>{
-    if(r.sec!==null) curSec=r.sec;
-
-    // 섹션별 그레이드 단가
-    let rGrade=gradeU||0;
-    if(rGrade>0){
-      if(curSec.includes('인터넷')) rGrade=gradeInU||0;
-      else if(curSec.includes('TV 단독')||curSec.includes('2ndTV')) rGrade=gradeTvU||0;
-    }
-
-    // 행의 실제 구분/카테고리 채우기
-    let sec=r.sec, cat=r.cat;
-    if(sec===null) for(let k=i-1;k>=0;k--){if(ROWS[k].sec!==null){sec=ROWS[k].sec;break;}}
-    if(cat===null) for(let k=i-1;k>=0;k--){if(ROWS[k].cat!==null){cat=ROWS[k].cat;break;}}
-
-    const row=[sec||'', cat||'', r.tv||'', r.in||''];
-    let tot=0;
-    activePols.forEach(p=>{
-      const fee=getVal(p.id,i);
-      row.push(fee||'');
-      if(!p.name||!p.name.includes('상품권')) tot+=fee;
-    });
-    const gift=giftVals[i]||0;
-    row.push(rGrade||'');
-    row.push(gift||'');
-    row.push(Math.floor((tot+rGrade)/100)*100||'');
-    row.push(Math.floor((tot+rGrade+gift)/100)*100||'');
-    wsData.push(row);
+/* ══════ 엑셀 저장 (보기 좋게 꾸민 양식 그대로) ══════
+   사용자가 손으로 꾸민 '2026년 10월' 시트와 같은 모양:
+   · 1행 정책번호 / 2행 정책명, 구분·카테고리·TV상품·인터넷은 행마다 반복 (필터·정렬이 되게)
+   · 회색 머리, 회색 상품 칸, 회계 서식(0 은 '-'), 얇은 가로줄, 눈금선 숨김, 왼쪽 4칸·위 2줄 고정
+   · 합계단가 (목표 달성 기준, 초록) / 목표달성·그레이드 제외 (파랑) 는 수식으로 넣어 고치면 따라 바뀐다
+   · 상품권 스위치를 끄면 상품권 열도 빠진다
+   스타일을 쓰려면 ExcelJS 가 필요해서 누를 때 한 번만 불러온다. */
+function loadScriptOnce(urls){
+  return new Promise((res,rej)=>{
+    const tryAt=i=>{
+      if(i>=urls.length) return rej(new Error('엑셀 라이브러리를 불러오지 못했습니다 (인터넷 연결 확인)'));
+      const s=document.createElement('script'); s.src=urls[i]; s.onload=()=>res(); s.onerror=()=>{ s.remove(); tryAt(i+1); };
+      document.head.appendChild(s);
+    };
+    tryAt(0);
   });
+}
+async function exportFeeTableToExcel(){
+  try{
+    if(typeof ExcelJS==='undefined'){
+      showGsStatus('엑셀 만드는 중...');
+      await loadScriptOnce(['https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js',
+                            'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js']);
+    }
+    const buf=await buildFeeWorkbook().xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='SKY_수수료표_'+((curMonthKey()||'').replace('-',''))+'.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    showGsStatus('엑셀을 저장했습니다');
+  }catch(e){ alert(e.message||e); }
+}
+function buildFeeWorkbook(){
+  const pols=policies.filter(p=>p.apply);
+  const feePols=pols.filter(p=>!String(p.name||'').includes('상품권'));
+  const gift=!!showGift;
+  const C={hdr:'FFD9D9D9', lab:'FFF2F2F2', line:'FFBFBFBF', sec:'FF808080',
+           totH:'FF9BBB59', tot:'FFEBF1DE', exH:'FF558ED5', ex:'FFC6D9F1', gH:'FFDCE6F1', g:'FFF5F8FC'};
+  const NUM='_-* #,##0_-;\\-* #,##0_-;_-* "-"_-;_-@_-';
+  const font={name:'맑은 고딕', size:10};
+  const wb=new ExcelJS.Workbook();
+  wb.creator='SKY 코드운영';
+  const ws=wb.addWorksheet((curMonth||'수수료표').slice(0,31),{
+    views:[{state:'frozen', xSplit:4, ySplit:2, showGridLines:false}],
+    pageSetup:{orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9,
+               margins:{left:.3,right:.3,top:.4,bottom:.4,header:.2,footer:.2}, printTitlesRow:'1:2'}
+  });
+  // 열 구성
+  const cols=[];   // {key, h1, h2, w, kind}
+  cols.push({h1:'구분',h2:'',w:10.9,kind:'lab'},{h1:'카테고리',h2:'',w:10.4,kind:'lab'},
+            {h1:'TV상품',h2:'',w:7.5,kind:'lab'},{h1:'인터넷',h2:'',w:7,kind:'lab'});
+  pols.forEach(p=>cols.push({h1:p.num||p.id||'',h2:p.name||'',w:11.1,kind:'pol',p}));
+  const gLab=(selIN&&selTV)? (selIN===selTV? fmtN(selIN)+'그레이드' : fmtN(selIN)+'×'+fmtN(selTV)+'그레이드') : '그레이드 없음';
+  cols.push({h1:'그레이드단가',h2:gLab,w:11.1,kind:'grade'});
+  if(gift) cols.push({h1:'상품권',h2:'합계 제외',w:10,kind:'gift'});
+  const goalTxt=(goalIN||goalTV)? ((goalIN&&goalTV&&goalIN===goalTV)? fmtN(goalIN)+'건 목표' : '본부 목표') : '목표';
+  cols.push({h1:'합계단가/\n'+goalTxt+'\n달성기준',w:11.6,kind:'tot'});
+  if(gift) cols.push({h1:'합계단가/\n상품권 포함',w:11.6,kind:'totg'});
+  cols.push({h1:'목표달성/\n그레이드 제외',w:11.6,kind:'ex'});
+  const L=i=>ws.getColumn(i+1).letter;
+  cols.forEach((c,i)=>{ ws.getColumn(i+1).width=c.w; });
 
-  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  // 머리 2줄
+  const r1=ws.getRow(1), r2=ws.getRow(2);
+  cols.forEach((c,i)=>{
+    const a=r1.getCell(i+1), b=r2.getCell(i+1);
+    const merge = c.kind==='lab'||c.kind==='tot'||c.kind==='totg'||c.kind==='ex';
+    a.value=c.h1; if(!merge) b.value=c.h2;
+    const fillH = c.kind==='tot'? C.totH : c.kind==='ex'? C.exH : c.kind==='totg'? C.totH : c.kind==='gift'? C.gH : C.hdr;
+    const bold = c.kind==='tot'||c.kind==='ex'||c.kind==='totg';
+    [a,b].forEach(x=>{
+      x.font={...font, bold, color:{argb: c.kind==='ex'?'FFFFFFFF':'FF000000'}};
+      x.alignment={horizontal:'center', vertical:'middle', wrapText:true};
+      x.fill={type:'pattern', pattern:'solid', fgColor:{argb: (c.kind==='pol'||c.kind==='grade') && x===a ? 'FFFFFFFF' : fillH}};
+      x.border={bottom:{style:'thin',color:{argb:C.line}}};
+    });
+    if(c.kind==='pol'||c.kind==='grade'){ a.border={}; a.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};
+      a.alignment={horizontal:'center', vertical:'bottom', shrinkToFit:true}; }
+    if(merge) ws.mergeCells(1,i+1,2,i+1);
+  });
+  r1.height=16; r2.height=30;
+  // 2행 정책명이 길면 높이를 늘린다
+  const longest=Math.max(0,...cols.filter(c=>c.kind==='pol').map(c=>String(c.h2).length));
+  if(longest>9) r2.height=42;
 
-  // 스타일 - 헤더 굵게
-  const range=XLSX.utils.decode_range(ws['!ref']);
-  for(let c=range.s.c;c<=range.e.c;c++){
-    const cell=ws[XLSX.utils.encode_cell({r:0,c})];
-    if(cell) cell.s={font:{bold:true},fill:{fgColor:{rgb:'E2E8F0'}}};
-  }
-
-  ws['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8}];
-  activePols.forEach(()=>ws['!cols'].push({wch:11}));
-  ws['!cols'].push({wch:11},{wch:10},{wch:14},{wch:14});
-
-  const wb=XLSX.utils.book_new();
-  const mth=(curMonthKey()||'').replace('-','')||'수수료표';
-  XLSX.utils.book_append_sheet(wb,ws,curMonth||'수수료표');
-  XLSX.writeFile(wb,'SKY_수수료표_'+mth+'.xlsx');
+  // 본문
+  let sec='',cat='',tv='';
+  const iGrade=cols.findIndex(c=>c.kind==='grade'), iGift=cols.findIndex(c=>c.kind==='gift');
+  const feeIdx=cols.map((c,i)=>(c.kind==='pol'&&!String(c.p.name||'').includes('상품권'))?i:-1).filter(i=>i>=0);
+  const exIdx=cols.map((c,i)=>(c.kind==='pol'&&!String(c.p.name||'').includes('상품권')&&!polGoalKind(c.p))?i:-1).filter(i=>i>=0);
+  ROWS.forEach((r,ri)=>{
+    const top=r.sec!=null && ri>0;
+    if(r.sec!=null){ sec=String(r.sec).replace(/\n/g,''); cat=''; tv=''; }
+    if(r.cat!=null) cat=String(r.cat).replace(/\n/g,'');
+    if(r.tv!=null) tv=String(r.tv);
+    const row=ws.getRow(ri+3); row.height=15;
+    const t=feeRowTotals(ri);
+    const R=ri+3;
+    cols.forEach((c,i)=>{
+      const x=row.getCell(i+1);
+      let v=null;
+      if(c.kind==='lab') v=[sec,cat,r.in?tv:(tv||''),r.in||''][i];
+      else if(c.kind==='pol') v=getVal(c.p.id,ri)||null;
+      else if(c.kind==='grade') v=t.grade||null;
+      else if(c.kind==='gift') v=t.gift||null;
+      if(c.kind==='lab' && i===2 && !r.in) v=tv;    // TV 단독·2ndTV 는 TV 칸만
+      if(c.kind==='tot'){
+        const parts=feeIdx.map(k=>L(k)+R).concat(iGrade>=0?[L(iGrade)+R]:[]);
+        v={formula:'ROUNDDOWN(SUM('+parts.join(',')+'),-2)', result:t.ex};
+      }else if(c.kind==='totg'){
+        const parts=feeIdx.map(k=>L(k)+R).concat([L(iGrade)+R, L(iGift)+R]);
+        v={formula:'ROUNDDOWN(SUM('+parts.join(',')+'),-2)', result:t.inc};
+      }else if(c.kind==='ex'){
+        const parts=exIdx.map(k=>L(k)+R);
+        const res=feePols.filter(p=>!polGoalKind(p)).reduce((a,p)=>a+getVal(p.id,ri),0);
+        v=parts.length? {formula:'SUM('+parts.join(',')+')', result:res} : 0;
+      }
+      x.value=v;
+      x.font={...font};
+      if(c.kind==='lab'){
+        x.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.lab}};
+        x.alignment={vertical:'middle', horizontal:'left'};
+      }else{
+        x.numFmt=NUM; x.alignment={vertical:'middle', horizontal:'center'};
+        const bg = c.kind==='tot'||c.kind==='totg'? C.tot : c.kind==='ex'? C.ex : c.kind==='gift'? C.g : null;
+        if(bg) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
+        if(c.kind==='tot') x.font={...font, bold:true};
+      }
+      x.border={bottom:{style:'thin',color:{argb:C.line}}, ...(top? {top:{style:'thin',color:{argb:C.sec}}}:{})};
+    });
+  });
+  return wb;
 }
 
 // ═══════════════════════════════
