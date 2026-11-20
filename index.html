@@ -693,8 +693,13 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .bd-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .bd-k>div{background:var(--soft);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .bd-k small{color:var(--sub);font-size:12px}.bd-k b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
-.bd-k em{font-style:normal;color:var(--dim);font-size:11.5px}
-.bd-avg{display:flex;gap:16px}.bd-avg span{display:flex;flex-direction:column}.bd-avg span em{font-size:11px;color:var(--sub)}
+.bd-k em{font-style:normal;color:var(--dim);font-size:11.5px;margin-top:auto;padding-top:6px}
+.bd-k>div>small{margin-bottom:4px}
+.bd-avg{display:flex;flex-direction:column;margin:2px 0 1px}
+.bd-avg-r{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:3px 0}
+.bd-avg-r+.bd-avg-r{border-top:1px solid rgba(20,30,50,.06)}
+.bd-avg-r span{font-size:12.5px;color:var(--sub)}
+.bd-k .bd-avg-r b{font-size:17px;font-weight:700;letter-spacing:-.01em}
 @media (max-width:760px){.bd-k{grid-template-columns:1fr}}
 .bd-gap td small.bd-by{display:block;color:var(--dim);font-size:11px}
 .bd-bar{display:flex;align-items:center;gap:8px;justify-content:flex-end}
@@ -4609,8 +4614,8 @@ async function renderBoard(){
     + '<span class="bd-wl">'+(wl? '<span class="dim">워크라인 '+esc(fmtDate(wl.at))+' 기준</span>' : '<span class="dim">워크라인 접수 · 개통 자료 없음</span>')
     + '<button class="soft sm" onclick="openWlHelp()">워크라인에서 가져오기</button></span></div><div class="bd-k">'
     + '<div><small>시장 최고가 대비 우리 (평균)</small>'
-      + (withGap.length? '<div class="bd-avg">'+[['사은품형','IPTV 일반'],['홈30%','홈30%']].map(([k,l])=>{ const xs=withGap.filter(r=>r.cat===k).map(r=>r.gap); if(!xs.length) return ''; const a=Math.round(xs.reduce((p,q)=>p+q,0)/xs.length);
-          return '<span><em>'+l+'</em><b class="'+(a<0?'cn':'cp')+'">'+(a>0?'+':'')+fmtMan(a)+'</b></span>'; }).join('')+'</div>' : '<b class="dim">시장가 없음</b>')
+      + (withGap.length? '<div class="bd-avg">'+[['사은품형','IPTV 일반'],['홈30%','IPTV 홈30%']].map(([k,l])=>{ const xs=withGap.filter(r=>r.cat===k).map(r=>r.gap); if(!xs.length) return ''; const a=Math.round(xs.reduce((p,q)=>p+q,0)/xs.length);
+          return '<div class="bd-avg-r"><span>'+l+'</span><b class="'+(a<0?'cn':'cp')+'">'+(a>0?'+':'')+fmtMan(a)+'</b></div>'; }).join('')+'</div>' : '<b class="dim">시장가 없음</b>')
       +'<em>'+(withGap.length? '그레이드'+(selIN&&selTV?' '+fmtN(selIN)+'×'+fmtN(selTV):'')+' 포함':'시장가 입력 탭에서 넣거나 불러오세요')+'</em></div>'
     + '<div><small>가장 자주 최고가인 상부</small><b>'+(lead?esc(lead[0]):'—')+'</b><em>'+(lead? withGap.length+'개 중 '+lead[1]+'개 상품':'')+'</em></div>'
     + '<div><small>우리 코드 접수 (이번 달)</small><b>'+(wm? fmtN((wm.rcvIN||0)+(wm.rcvTV||0))+'건' : '—')+'</b>'
