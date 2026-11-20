@@ -205,6 +205,10 @@ button[disabled]{opacity:.45;cursor:default}
 .tabs button{border:0;background:none;padding:8px 2px;cursor:pointer;color:var(--sub);
              font-weight:600;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button.on{color:var(--text);border-color:var(--text)}
+.tabs.idx{gap:4px;border-bottom:2px solid var(--pri);margin:0 0 16px;padding-left:4px}
+.tabs.idx button{padding:9px 20px;border:1px solid var(--line2);border-bottom:0;border-radius:10px 10px 0 0;background:#eef3fd;color:#4a6fb5;font-size:14px;margin-bottom:0}
+.tabs.idx button:hover{background:#e1eafc;color:var(--pri-d)}
+.tabs.idx button.on{background:var(--pri);border-color:var(--pri);color:#fff}
 
 /* ── 공통 표 ──────────────────────────────────────────── */
 .tw{overflow:auto;max-height:660px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
@@ -382,9 +386,9 @@ body:not(.readonly) .ph:hover .pn{color:var(--pri-d)}
 .addcol:hover{border-color:var(--pri);border-style:solid;color:#fff;background:var(--pri)}
 
 /* ── 그레이드 매트릭스 (v19) : ┌ 모양으로 머리와 왼쪽 열이 한 몸으로 고정 ── */
-.matrix-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);max-height:calc(100vh - 230px)}
+.matrix-wrap{overflow-x:auto;overflow-y:visible;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .mx-tbl{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
-.mx-tbl th,.mx-tbl td{padding:7px 9px;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;border-bottom:1px solid #f1f3f6}
+.mx-tbl th,.mx-tbl td{padding:7px 6px;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;border-bottom:1px solid #f1f3f6}
 .mx-tbl thead th{position:sticky;top:0;z-index:4;background:#f8f9fb;color:var(--sub);font-weight:600;border-bottom:1px solid var(--line)}
 .mx-tbl th.mx-th-row{position:sticky;left:0;z-index:3;background:#f8f9fb;color:var(--sub);font-weight:600;box-shadow:inset -1px 0 0 var(--line)}
 .mx-tbl thead th.mx-corner{left:0;z-index:6;color:var(--dim);font-size:11px;box-shadow:inset -1px 0 0 var(--line)}
@@ -681,7 +685,9 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .pol-pv{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px}
 .pol-pv details{padding:4px 0;border-bottom:1px dashed var(--line)}.pol-pv details:last-child{border:0}
 .pol-pv summary{cursor:pointer}.pol-pv details div{color:var(--sub);padding:6px 0 4px 14px;line-height:1.6}
-.bd-sum .bd-t{font-weight:700;font-size:15px;margin-bottom:10px}
+.bd-sum .bd-t{font-weight:700;font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bd-wl{margin-left:auto;display:flex;align-items:center;gap:10px;font-weight:400;font-size:12.5px}
+.soft.sm{padding:6px 11px;font-size:12.5px;border-radius:9px}
 .bd-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .bd-k>div{background:var(--soft);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .bd-k small{color:var(--sub);font-size:12px}.bd-k b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -716,7 +722,13 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .dec-kinds label:has(input:checked){border-color:var(--pri);background:var(--pri-w);color:var(--pri-d);font-weight:600}
 .dec-kinds input{margin:0}
 .dec-err{color:var(--up);font-size:12.5px;min-height:16px;margin-top:8px}
-.wl-steps{padding-left:18px;line-height:1.7;font-size:13.5px}
+.wl-help .wl-card{display:flex;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13.5px;line-height:1.55}
+.wl-help .wl-card p{margin:4px 0 0;color:var(--sub)}
+.wl-n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--pri);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.wl-help .wl-bm{margin:10px 0 4px}
+.wl-sm{font-size:12px}.wl-help kbd{border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11.5px;background:#f8f9fb}
+.wl-man{margin-top:8px;font-size:12.5px}.wl-man summary{cursor:pointer;color:var(--sub)}
+.wl-man ol{margin:6px 0 8px;padding-left:18px;color:var(--sub)}
 .wl-bm{display:inline-block;background:#1c2230;color:#fff!important;border-radius:9px;padding:8px 14px;font-weight:700;text-decoration:none;cursor:grab}
 /* 시장가 비교 */
 .cmp-grp{margin-bottom:16px}
@@ -825,7 +837,29 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 .pace-h .pk b{color:var(--text)}.pace-h .pk.none{display:block}
 .gs-pjt{display:block;font-size:10.5px;font-weight:700;color:#7a5af5;margin-top:1px}
 .foot-note .pc{font-size:10.5px;padding:0 5px}
-.nx-v2{margin-top:2px}
+.nx-v2{margin-top:0}
+.gs-panel{margin-bottom:16px}
+.gs-top{display:grid;grid-template-columns:minmax(320px,0.95fr) minmax(0,1.6fr);gap:14px;align-items:stretch}
+.gs-top .pace-h{margin:0;height:100%;box-sizing:border-box}
+.gs-top .nx-v2{margin-bottom:0}
+.gs-top .nx-v2{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+@media (max-width:1180px){.gs-top{grid-template-columns:1fr}}
+.gs-mx-card{margin-bottom:16px}
+.gs-mx-card .mx-tbl{font-size:11.5px}
+.gs-help{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.gs-help>summary{cursor:pointer;list-style:none;padding:10px 14px;font-size:13px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px}
+.gs-help>summary::-webkit-details-marker{display:none}
+.gs-help>summary::before{content:'▸';transition:transform .15s;display:inline-block}
+.gs-help[open]>summary::before{transform:rotate(90deg)}
+.gs-help-b{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:4px 16px 16px;border-top:1px solid var(--line)}
+@media (max-width:1100px){.gs-help-b{grid-template-columns:1fr}}
+.gs-help h4{margin:12px 0 8px;font-size:13.5px;color:var(--text);display:flex;align-items:center;gap:6px}
+.gs-steps,.gs-ul,.gs-lv{margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text)}
+.gs-steps li,.gs-ul li{margin-bottom:6px}
+.gs-steps small{display:block;color:var(--sub);font-size:12px}
+.gs-lv{list-style:none;padding:0}.gs-lv li{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:var(--sub)}
+.gs-lv .pc{min-width:76px;text-align:center}
+.gs-tip{font-size:12.5px;color:var(--sub);margin:8px 0 0}
 .gs-t th small{font-weight:400}
 .gs-t td.dimn{color:var(--sub)}
 .gs-bar{position:relative;display:flex;align-items:center;justify-content:flex-end;min-width:110px;height:22px;padding-right:2px}
@@ -1061,17 +1095,19 @@ window.SKY_CONFIG = {
     <div class="page" id="page-grade">
       <div class="strip"><div class="gv" id="gv" style="width:100%"></div><span hidden id="mx-ver-label"></span></div>
       <div id="gv-old"></div>
-      <div class="grade-grid">
+      <div id="gradeDiffSection"></div>
+      <div class="card gs-mx-card">
+        <div class="card-h"><h2><span class="ib c2"><svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12M2 10h12M6 2v12M10 2v12"/></svg></span>그레이드 표</h2><span class="hint">칸을 누르면 그 달 그레이드 목표로 정합니다</span></div>
         <div class="matrix-wrap">
           <table class="mx-tbl" id="mx-tbl"></table>
         </div>
-        <div id="gradeDiffSection" style="min-width:420px"></div>
       </div>
+      <div id="gradeStepTable"></div>
     </div>
 
     <!-- ── 분석 통합 ── -->
     <div class="page" id="page-compare">
-      <div class="tabs" id="cm-tabs">
+      <div class="tabs idx" id="cm-tabs">
         <button data-t="input" class="on" onclick="cmSetTab('input')">시장가 입력</button>
         <button data-t="board" onclick="cmSetTab('board')">판단 보드</button>
       </div>
@@ -2708,16 +2744,22 @@ function renderGradeSide(T, old){
       + (r? '<div class="nx-pace">'+paceChip(r)+'<small>'+paceLine(r,P)+'</small></div>' : '')
       + '</div>'; })();
 
-  let h='<div class="card" style="margin:0">'
-    + '<div class="card-h"><h2><span class="ib c3">'+ICO.chart+'</span>한 단계 더 가면</h2></div>'
-    + '<p class="sub" style="margin:-4px 0 10px">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+man(cur)+'</b></p>'
-    + paceHead(P,a,b)
-    + '<div class="nx nx-v2">'
-      + card('인터넷만','인터넷 1건당',sIN, sIN?'+'+fmtN(sIN.n)+'건':'')
-      + card('TV만','TV 1건당',sTV, sTV?'+'+fmtN(sTV.n)+'건':'')
-      + card('둘 다','번들 1건당',sBo, sBo?'각 +'+fmtN(sBo.n)+'건':'')
+  let h='<div class="card gs-panel">'
+    + '<div class="card-h"><h2><span class="ib c3">'+ICO.chart+'</span>한 단계 더 가면</h2>'
+    + '<span class="hint">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+man(cur)+'</b></span></div>'
+    + '<div class="gs-top">'
+      + '<div class="gs-left">'+paceHead(P,a,b)+'</div>'
+      + '<div class="nx nx-v2">'
+        + card('인터넷만','인터넷 1건당',sIN, sIN?'+'+fmtN(sIN.n)+'건':'')
+        + card('TV만','TV 1건당',sTV, sTV?'+'+fmtN(sTV.n)+'건':'')
+        + card('둘 다','번들 1건당',sBo, sBo?'각 +'+fmtN(sBo.n)+'건':'')
+      + '</div>'
     + '</div>'
-    + '<div class="tw" style="max-height:430px"><table class="t gs-t"><thead><tr>'
+    + gsHelpHtml(P)
+    + '</div>';
+  let t='<div class="card"><div class="card-h"><h2><span class="ib c1">'+ICO.list+'</span>인터넷 = TV 로 늘릴 때</h2>'
+    + '<span class="hint">이번 구간 건당 = 늘어난 금액 ÷ 늘어난 건수 · <b class="gs-k">초록</b>은 평균보다 한 건 값어치가 큰 구간</span></div>'
+    + '<div class="tw" style="max-height:none"><table class="t gs-t"><thead><tr>'
     + '<th>인터넷 = TV</th><th class="n">지급총액<br><small>앞 구간보다</small></th>'
     + '<th class="n gs-pc">이번 구간<br><small>번들 1건당</small></th>'
     + '<th class="n">평균<br><small>번들 1건당</small></th></tr></thead><tbody>'
@@ -2733,15 +2775,36 @@ function renderGradeSide(T, old){
                 + '<b class="'+(hi?'hi':'')+'">'+fmtN(r.per)+'</b></div>')+'</td>'
           + '<td class="n dimn">'+fmtN(r.unit)+'</td></tr>';
       }).join('')
-    + '</tbody></table></div>'
-    + '<div class="foot-note"><span>'+(P&&P.mode==='rcv'
-        ? '<b>도달 판단</b> = (남은 개통 − 대기×개통율) ÷ 개통율 ÷ 접수 가능한 날(남은 일수 − 접수→개통 '+P.L+'일)을 지금 하루 접수와 비교. '
-        : '<b>도달 판단</b> = 남은 건수 ÷ 남은 일수(달력 기준)를 지금까지의 하루 평균과 비교. ')
-    + '지금 속도 이하면 <i class="pc ok">도달 가능</i>, '+PACE_TIGHT+'배까지 <i class="pc tight">조금 더 필요</i>, 그 위는 <i class="pc hard">어려움</i>.<br>'
-    + '<b>이번 구간 건당</b> = 늘어난 금액 ÷ 늘어난 건수. '
-    + '<b class="gs-k">초록 막대</b>는 평균보다 한 건 값어치가 큰 구간이에요. '
-    + '<b>더 하는 건수에만</b> 쓰는 비용(프로모션·추가 단가)이 건당 이 금액보다 적으면, 그레이드만으로도 남습니다.</span></div></div>';
+    + '</tbody></table></div></div>';
   ds.innerHTML=h;
+  const st=document.getElementById('gradeStepTable'); if(st) st.innerHTML=t;
+}
+/* 판단 기준 설명 : 접어두고, 펴면 지금 숫자를 넣어 단계별로 보여준다 */
+function gsHelpHtml(P){
+  let open=false; try{ open=localStorage.getItem('sky_gsHelp')==='1'; }catch(e){}
+  const pct=v=>Math.round(v*100)+'%';
+  const steps= P&&P.mode==='rcv'
+    ? '<ol class="gs-steps">'
+      + '<li><b>남은 개통</b> = 목표 − 지금 개통 − (대기 건 × 개통율)<small>대기 '+fmtN(P.pendIN)+' / '+fmtN(P.pendTV)+'건 중 '+pct(P.rIN)+' / '+pct(P.rTV)+'는 곧 개통된다고 봅니다</small></li>'
+      + '<li><b>필요한 접수</b> = 남은 개통 ÷ 개통율<small>최근 '+P.rMonths.length+'개월('+P.rMonths.slice().reverse().map(m=>+m.slice(5)+'월').join('·')+') 접수 중 개통된 비율</small></li>'
+      + '<li><b>접수할 수 있는 날</b> = 남은 일수 − 접수→개통 '+P.L+'일 = <b>'+P.W+'일</b><small>월말 '+P.L+'일 안쪽 접수는 다음 달 개통으로 넘어가기 쉬워서 뺍니다</small></li>'
+      + '<li><b>하루 필요한 접수</b> = 필요한 접수 ÷ 접수할 수 있는 날 → 지금 하루 접수와 비교</li></ol>'
+    : '<ol class="gs-steps">'
+      + '<li><b>남은 개통</b> = 목표 − 지금 개통</li>'
+      + '<li><b>하루 필요한 개통</b> = 남은 개통 ÷ 남은 일수 (달력 기준) → 지금까지 하루 평균과 비교</li></ol>'
+      + '<p class="gs-tip">워크라인 자료를 가져오면 접수 · 개통율 · 접수→개통 날짜까지 넣어 더 정확하게 판단합니다. <a href="#" onclick="openWlHelp();return false">가져오는 법</a></p>';
+  return '<details class="gs-help"'+(open?' open':'')+' ontoggle="try{localStorage.setItem(\'sky_gsHelp\',this.open?\'1\':\'0\')}catch(e){}">'
+    + '<summary>판단 기준 · 계산 방법</summary><div class="gs-help-b">'
+    + '<section><h4>도달 판단은 이렇게 합니다'+(P&&P.mode==='rcv'?' <span class="pc done">접수 기준</span>':' <span class="pc">개통 기준</span>')+'</h4>'+steps+'</section>'
+    + '<section><h4>표시 기준</h4><ul class="gs-lv">'
+      + '<li><i class="pc ok">도달 가능</i> 필요한 속도가 지금 속도 이하</li>'
+      + '<li><i class="pc tight">조금 더 필요</i> 지금 속도의 '+PACE_TIGHT+'배까지</li>'
+      + '<li><i class="pc hard">어려움</i> 지금 속도의 '+PACE_TIGHT+'배 넘게 필요하거나, 남은 날이 없을 때</li></ul></section>'
+    + '<section><h4>건당 금액은 이렇게 봅니다</h4><ul class="gs-ul">'
+      + '<li><b>건당</b> = 늘어나는 금액 ÷ 늘어나는 건수 (예: 300만원 ÷ 50건 = 6만원)</li>'
+      + '<li>추가 건에<b>만</b> 쓰는 비용(프로모션 · 추가 단가)이 건당 금액보다 적으면 그레이드만으로도 남습니다.</li>'
+      + '<li>전체 단가를 올리는 건 기존 건에도 다 붙어서 이 기준이 맞지 않아요.</li></ul></section>'
+    + '</div></details>';
 }
 function paceHead(P,a,b){
   if(!P) return '';
@@ -4498,7 +4561,9 @@ async function renderBoard(){
 
   // 요약
   let h='<div class="card bd-sum">'
-    + '<div class="bd-t">'+(+ym.slice(5))+'월 한눈에</div><div class="bd-k">'
+    + '<div class="bd-t">'+(+ym.slice(5))+'월 한눈에'
+    + '<span class="bd-wl">'+(wl? '<span class="dim">워크라인 '+esc(fmtDate(wl.at))+' 기준</span>' : '<span class="dim">워크라인 접수 · 개통 자료 없음</span>')
+    + '<button class="soft sm" onclick="openWlHelp()">워크라인에서 가져오기</button></span></div><div class="bd-k">'
     + '<div><small>시장 최고가 대비 우리 (평균)</small><b class="'+(avg==null?'dim':avg<0?'cn':'cp')+'">'+(avg==null?'시장가 없음':(avg>0?'+':'')+fmtMan(avg))+'</b>'
       +'<em>'+(withGap.length? withGap.length+'개 상품 · 그레이드'+(selIN&&selTV?' '+fmtN(selIN)+'×'+fmtN(selTV):'')+' 포함':'시장가 입력 탭에서 넣거나 불러오세요')+'</em></div>'
     + '<div><small>가장 자주 최고가인 상부</small><b>'+(lead?esc(lead[0]):'—')+'</b><em>'+(lead? withGap.length+'개 중 '+lead[1]+'개 상품':'')+'</em></div>'
@@ -4541,7 +4606,7 @@ async function renderBoard(){
      + '</tbody></table></div>';
   }
   h+='<div class="foot-note"><span>단가는 그 달 수수료표와 시장가 입력 값으로 계산합니다. 접수 · 개통은 워크라인 전체 고객관리에서 상부점 <b>1.유SKY-우리</b> 건만 센 숫자입니다.'
-    + ' <a href="#" onclick="openWlHelp();return false">워크라인에서 가져오기</a></span></div></div>';
+    + '</span></div></div>';
 
   // ③ 판단 이력
   const top=(_decisions||[]).filter(d=>!d.parent_id);
@@ -4676,14 +4741,32 @@ window.open(DASH+'#wl='+encodeURIComponent(JSON.stringify(pay)),'_blank');
   return 'javascript:'+encodeURIComponent(code.replace(/\n/g,''));
 }
 function openWlHelp(){
-  const wl=wlData();
+  const wl=wlData(), mac=/Mac/.test(navigator.platform||'');
   openModal('워크라인에서 접수 · 개통 건수 가져오기',
-    '<ol class="wl-steps">'
-    + '<li>아래 버튼을 <b>브라우저 북마크바로 끌어다 놓으세요</b> (한 번만).<div style="margin:10px 0"><a class="wl-bm" href="'+wlBookmarkletSrc()+'" onclick="alert(\'클릭하지 말고 북마크바로 끌어다 놓으세요\');return false">SKY 실적 가져오기</a></div></li>'
-    + '<li>워크라인에 로그인한 화면에서 그 북마크를 누릅니다.</li>'
-    + '<li>몇 초 뒤 대시보드가 새 탭으로 열리고, 관리자로 로그인돼 있으면 바로 저장됩니다.</li></ol>'
-    + '<p class="hint">상부점 <b>'+esc(WL_UPPER)+'</b> 건을 최근 6개월 동안 <b>건수로만</b> 셉니다. 고객 이름 · 연락처는 대시보드로 오지 않습니다. TV 개통은 (추단) 줄을 뺀 수입니다.</p>'
-    + (wl? '<p class="hint">마지막으로 가져온 때: '+esc(fmtDate(wl.at))+(wl.by?' · '+esc(wl.by):'')+'</p>':''), {wide:true});
+    '<div class="wl-help">'
+    + '<p class="sub" style="margin:0 0 14px">워크라인은 보안 때문에 대시보드가 직접 읽을 수 없어서, <b>워크라인 화면에서 누르는 북마크</b> 하나로 건수를 넘겨받습니다. 처음 한 번만 북마크를 만들어 두면 됩니다.</p>'
+    + '<div class="wl-card"><div class="wl-n">1</div><div><b>북마크 만들기 (처음 한 번)</b>'
+      + '<p>아래 버튼을 마우스로 잡아 <b>브라우저 위쪽 북마크바</b>로 끌어다 놓으세요.</p>'
+      + '<a class="wl-bm" href="'+wlBookmarkletSrc()+'" onclick="alert(\'누르지 말고, 마우스로 잡아서 브라우저 위쪽 북마크바로 끌어다 놓으세요\');return false" title="북마크바로 끌어다 놓으세요">★ SKY 실적 가져오기</a>'
+      + '<p class="wl-sm">북마크바가 안 보이면 <kbd>'+(mac?'⌘':'Ctrl')+'</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> 를 누르면 나타납니다.</p>'
+      + '<details class="wl-man"><summary>끌어다 놓기가 안 되면 (직접 만들기)</summary>'
+        + '<ol><li>북마크바에서 오른쪽 클릭 → <b>페이지 추가</b> (또는 북마크 추가)</li>'
+        + '<li>이름: <b>SKY 실적 가져오기</b></li>'
+        + '<li>URL 칸에 아래 버튼으로 복사한 내용을 붙여넣고 저장</li></ol>'
+        + '<button class="ghost sm" onclick="wlCopyBm(this)">URL 복사</button></details>'
+    + '</div></div>'
+    + '<div class="wl-card"><div class="wl-n">2</div><div><b>워크라인에서 누르기</b>'
+      + '<p>워크라인(workline.kr)에 로그인한 화면에서 북마크바의 <b>SKY 실적 가져오기</b>를 누릅니다. 오른쪽 위에 진행 상황이 뜨고 10~30초 걸립니다.</p></div></div>'
+    + '<div class="wl-card"><div class="wl-n">3</div><div><b>대시보드에 저장</b>'
+      + '<p>끝나면 대시보드가 새 탭으로 열리고, <b>관리자(admin)로 로그인돼 있으면</b> 바로 저장됩니다. 로그인 전이면 로그인하는 순간 저장돼요.</p></div></div>'
+    + '<p class="hint" style="margin:12px 0 0">상부점 <b>'+esc(WL_UPPER)+'</b> 건을 최근 6개월 동안 <b>건수로만</b> 셉니다. 고객 이름 · 연락처는 대시보드로 오지 않습니다.'
+    + (wl? '<br>마지막으로 가져온 때: <b>'+esc(fmtDate(wl.at))+'</b>'+(wl.by?' · '+esc(wl.by):''):'')+'</p>'
+    + '</div>', {wide:true});
+}
+async function wlCopyBm(btn){
+  const src=wlBookmarkletSrc();
+  try{ await navigator.clipboard.writeText(src); btn.textContent='복사했습니다 ✓'; }
+  catch(e){ prompt('아래 내용을 모두 복사하세요 (Ctrl+C)', src); }
 }
 /* 주소 #wl=… 로 들어온 자료 */
 let _wlPending=null;
