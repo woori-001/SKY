@@ -2754,7 +2754,7 @@ function renderGradeSide(T, old){
   both.forEach(n=>{
     const man=L(n,n); if(!man) return;
     const tw=man*10000, r={n, tw, unit:Math.round(tw*.55/n)+Math.round(tw*.45/n)};
-    if(prev){ r.d=tw-prev.tw; r.dn=n-prev.n; r.per=Math.round(r.d/r.dn); }
+    if(prev){ r.d=tw-prev.tw; r.dn=n-prev.n; r.per=Math.round(r.d/r.dn); r.pn=prev.n; r.pu=prev.unit; }
     rows.push(r); prev=r;
   });
   const mark=Math.min(a,b);
@@ -2788,11 +2788,11 @@ function renderGradeSide(T, old){
     + gsHelpHtml(P)
     + '</div>';
   let t='<div class="card"><div class="card-h"><h2><span class="ib c1">'+ICO.list+'</span>인터넷 = TV 로 늘릴 때</h2>'
-    + '<span class="hint">이번 구간 건당 = 늘어난 금액 ÷ 늘어난 건수 · <b class="gs-k">초록</b>은 평균보다 한 건 값어치가 큰 구간</span></div>'
+    + '<span class="hint"><b>추가분 건당</b> = 앞 구간보다 늘어난 금액 ÷ 늘어난 건수 (기존 건 단가 상승분 포함) · <b>평균</b> = 실제 지급 단가 · <b class="gs-k">초록</b>은 평균보다 추가 1건 값어치가 큰 구간</span></div>'
     + '<div class="tw" style="max-height:none"><table class="t gs-t"><thead><tr>'
     + '<th>인터넷=TV</th><th class="n">지급총액<br><small>만원 · 앞 구간보다</small></th>'
-    + '<th class="n gs-pc">이번 구간<br><small>번들 1건당</small></th>'
-    + '<th class="n gs-avg">평균<br><small>번들 1건당</small></th></tr></thead><tbody>'
+    + '<th class="n gs-pc" title="앞 구간보다 늘어난 금액 ÷ 늘어난 건수. 구간이 오르면 이미 한 건의 단가도 같이 오르므로 그 상승분까지 들어갑니다">추가분 건당<br><small>번들 1건</small></th>'
+    + '<th class="n gs-avg" title="지급총액 ÷ 건수 = 그 구간에서 실제로 받는 건당 단가">평균<br><small>실제 지급 단가</small></th></tr></thead><tbody>'
     + rows.map(r=>{
         const isCur=r.n===mark, isNext=r.n===nextN;
         const hi=r.per!=null && r.per>r.unit;   // 이 구간 한 건이 평균보다 값어치가 큼
@@ -2801,7 +2801,7 @@ function renderGradeSide(T, old){
           + (r.n===projN?' <span class="badge gs-pj" title="지금 속도대로면 월말에 닿는 구간 (인터넷·TV 중 낮은 쪽 기준)">예상</span>':'')+'</td>'
           + '<td class="n">'+fmtN(Math.round(r.tw/10000))+(r.d==null?'':' <small class="gs-d">+'+fmtN(Math.round(r.d/10000))+'</small>')+'</td>'
           + '<td class="n gs-pc">'+(r.per==null?'<span class="dim">—</span>'
-              : '<b class="gs-per'+(hi?' hi':'')+'" title="'+man(r.d)+' ÷ '+fmtN(r.dn)+'건 · 평균 '+fmtN(r.unit)+'원">'+fmtN(r.per)+'</b>')+'</td>'
+              : '<b class="gs-per'+(hi?' hi':'')+'" title="'+man(r.d)+' ÷ '+fmtN(r.dn)+'건 = '+fmtN(r.per)+'원&#10;· 기존 '+fmtN(r.pn)+'건 단가 '+fmtN(r.pu)+' → '+fmtN(r.unit)+'원 : '+man(r.pn*(r.unit-r.pu))+'&#10;· 새 '+fmtN(r.dn)+'건 × '+fmtN(r.unit)+'원 : '+man(r.dn*r.unit)+'">'+fmtN(r.per)+'</b>')+'</td>'
           + '<td class="n dimn gs-avg">'+fmtN(r.unit)+'</td></tr>';
       }).join('')
     + '</tbody></table></div></div>';
@@ -2830,7 +2830,7 @@ function gsHelpHtml(P){
       + '<li><i class="pc tight">조금 더 필요</i> 지금 속도의 '+PACE_TIGHT+'배까지</li>'
       + '<li><i class="pc hard">어려움</i> 지금 속도의 '+PACE_TIGHT+'배 넘게 필요하거나, 남은 날이 없을 때</li></ul></section>'
     + '<section><h4>건당 금액은 이렇게 봅니다</h4><ul class="gs-ul">'
-      + '<li><b>건당</b> = 늘어나는 금액 ÷ 늘어나는 건수 (예: 300만원 ÷ 50건 = 6만원)</li>'
+      + '<li><b>추가분 건당</b> = 늘어나는 금액 ÷ 늘어나는 건수 (예: 500만원 ÷ 50건 = 10만원). 구간이 오르면 이미 한 건의 단가도 같이 올라서, 실제 지급 단가(평균)보다 크게 나옵니다.</li>'
       + '<li>추가 건에<b>만</b> 쓰는 비용(프로모션 · 추가 단가)이 건당 금액보다 적으면 그레이드만으로도 남습니다.</li>'
       + '<li>전체 단가를 올리는 건 기존 건에도 다 붙어서 이 기준이 맞지 않아요.</li></ul></section>'
     + '</div></details>';
