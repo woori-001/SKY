@@ -692,6 +692,7 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .bd-k>div{background:var(--soft);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .bd-k small{color:var(--sub);font-size:12px}.bd-k b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .bd-k em{font-style:normal;color:var(--dim);font-size:11.5px}
+.bd-avg{display:flex;gap:16px}.bd-avg span{display:flex;flex-direction:column}.bd-avg span em{font-size:11px;color:var(--sub)}
 @media (max-width:760px){.bd-k{grid-template-columns:1fr}}
 .bd-gap td small.bd-by{display:block;color:var(--dim);font-size:11px}
 .bd-bar{display:flex;align-items:center;gap:8px;justify-content:flex-end}
@@ -940,7 +941,12 @@ body.readonly .hbtns .primary{display:none}
 @media (max-width:900px){
   .app{grid-template-columns:1fr}
   .sb{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
-  .sb-mid{flex-direction:row;flex-wrap:wrap;overflow:visible}
+  .sb-mid{flex-direction:row;flex-wrap:wrap;overflow:visible;gap:8px}
+  .sb-mid>*{flex:1 1 100%;min-width:0}
+  .sb-mid .mode{display:flex}.sb-mid .mode button{flex:1}
+  .mode-pane .sb-sec{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%}
+  .mode-pane .sb-sec+.sb-sec{margin-top:4px}
+  .sb-sec .nav{width:auto;min-width:0;padding:8px 10px}
   .sb-lbl,.sb-info,.sb-bottom .sb-hr{display:none}
   .ntx small{display:none}
   .content{padding:18px 16px 50px}
@@ -2705,10 +2711,10 @@ function paceLine(r,P){
     const vr=useTV? P.vrTV : P.vrIN;
     if(o.byPend) return '대기 건이 개통되면 충분<br><span class="dim">'+fmtN(o.need)+'건 남음</span>';
     if(o.late) return nm+' 이번 달 접수로는 늦음<br><span class="dim">접수→개통 '+P.L+'일 · '+fmtN(o.rest)+'건 남음</span>';
-    return nm+' 하루 <b>접수 '+f(o.per)+'건</b> 필요<br><span class="dim">지금 하루 접수 '+f(vr)+'건 · 개통 '+fmtN(o.need)+'건 남음</span>';
+    return nm+' 하루 <b>접수 '+(o.per===Infinity?'—':fmtN(Math.ceil(o.per)))+'건</b> 필요<br><span class="dim">지금 하루 접수 '+f(vr)+'건 · 개통 '+fmtN(o.need)+'건 남음</span>';
   }
   const v=useTV? P.vTV : P.vIN;
-  return nm+' 하루 <b>'+f(o.per)+'건</b> 필요<br><span class="dim">지금 하루 '+f(v)+'건 · '+fmtN(o.need)+'건 남음</span>';
+  return nm+' 하루 <b>'+(o.per===Infinity?'—':fmtN(Math.ceil(o.per)))+'건</b> 필요<br><span class="dim">지금 하루 '+f(v)+'건 · '+fmtN(o.need)+'건 남음</span>';
 }
 
 /* ── 오른쪽 : 지금 칸에서 한 단계 더 ─────────────────────── */
@@ -3642,7 +3648,7 @@ const PSUB={
   table :'정책 항목별 단가를 월별로 관리합니다',
   grade :'칸을 눌러 그 달 그레이드 목표를 정합니다 · 한 단계 더 가면 얼마가 더 들어오는지 봅니다',
   goal:'본부 목표 대비 구간 · 달성률 · 미달하면 터질 금액',
-  compare:'시장단가·상부 대비 우리 수수료 차액',
+  compare:'시장가 입력 · 시장 대비 부족액 · 판단 이력',
   rsum :'월말 확정값을 넣으면 나머지는 전부 계산됩니다',
   rgrade:'월초에 잡았던 목표 대비 실제로 어디까지 갔나',
   rgoal:'구간 · 달성률 · 100% 로 깔아둔 단가 대비 터진 금액',
@@ -4606,8 +4612,10 @@ async function renderBoard(){
     + '<div class="bd-t">'+(+ym.slice(5))+'월 한눈에'
     + '<span class="bd-wl">'+(wl? '<span class="dim">워크라인 '+esc(fmtDate(wl.at))+' 기준</span>' : '<span class="dim">워크라인 접수 · 개통 자료 없음</span>')
     + '<button class="soft sm" onclick="openWlHelp()">워크라인에서 가져오기</button></span></div><div class="bd-k">'
-    + '<div><small>시장 최고가 대비 우리 (평균)</small><b class="'+(avg==null?'dim':avg<0?'cn':'cp')+'">'+(avg==null?'시장가 없음':(avg>0?'+':'')+fmtMan(avg))+'</b>'
-      +'<em>'+(withGap.length? withGap.length+'개 상품 · 그레이드'+(selIN&&selTV?' '+fmtN(selIN)+'×'+fmtN(selTV):'')+' 포함':'시장가 입력 탭에서 넣거나 불러오세요')+'</em></div>'
+    + '<div><small>시장 최고가 대비 우리 (평균)</small>'
+      + (withGap.length? '<div class="bd-avg">'+[['사은품형','IPTV 일반'],['홈30%','홈30%']].map(([k,l])=>{ const xs=withGap.filter(r=>r.cat===k).map(r=>r.gap); if(!xs.length) return ''; const a=Math.round(xs.reduce((p,q)=>p+q,0)/xs.length);
+          return '<span><em>'+l+'</em><b class="'+(a<0?'cn':'cp')+'">'+(a>0?'+':'')+fmtMan(a)+'</b></span>'; }).join('')+'</div>' : '<b class="dim">시장가 없음</b>')
+      +'<em>'+(withGap.length? '그레이드'+(selIN&&selTV?' '+fmtN(selIN)+'×'+fmtN(selTV):'')+' 포함':'시장가 입력 탭에서 넣거나 불러오세요')+'</em></div>'
     + '<div><small>가장 자주 최고가인 상부</small><b>'+(lead?esc(lead[0]):'—')+'</b><em>'+(lead? withGap.length+'개 중 '+lead[1]+'개 상품':'')+'</em></div>'
     + '<div><small>우리 코드 접수 (이번 달)</small><b>'+(wm? fmtN((wm.rcvIN||0)+(wm.rcvTV||0))+'건' : '—')+'</b>'
       +'<em>'+(share&&shareTot? 'SKYLIFE 전체 '+fmtN(shareTot)+'건 중 '+(Math.round(ours/shareTot*1000)/10)+'%' : (wl?'':'워크라인 자료 없음'))+'</em></div>'
