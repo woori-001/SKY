@@ -698,7 +698,11 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .bd-bar span{flex:1;height:8px;background:#f1f3f6;border-radius:4px;overflow:hidden;display:flex;justify-content:flex-end}
 .bd-bar i{display:block;height:100%;border-radius:4px}.bd-bar i.neg{background:#f19b9e}.bd-bar i.pos{background:#7fd1a6}
 .bd-bar b{min-width:76px;text-align:right;font-variant-numeric:tabular-nums}
-.bd-tr td:first-child{color:var(--sub);font-size:12.5px;white-space:nowrap}
+.bd-tr td{white-space:nowrap}.bd-tr th small{font-weight:400}
+.bd-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
+.bd-row>.card{margin:0;min-width:0}
+@media (max-width:1100px){.bd-row{grid-template-columns:1fr}}
+.bd-tr td,.bd-tr th{padding:8px 9px}.bd-gap td,.bd-gap th{padding:8px 10px}
 .bd-col{height:38px;display:flex;align-items:flex-end;justify-content:flex-end}.bd-col i{width:22px;background:#5c8ff0;border-radius:4px 4px 0 0}
 .dec-list{display:flex;flex-direction:column;gap:10px}
 .dec-it{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
@@ -844,15 +848,21 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 .gs-top .nx-v2{margin-bottom:0}
 .gs-top .nx-v2{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 @media (max-width:1180px){.gs-top{grid-template-columns:1fr}}
-.gs-row{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,4fr);gap:16px;align-items:start}
-@media (max-width:1100px){.gs-row{grid-template-columns:1fr}}
+.gs-row{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:16px;align-items:start}
+@media (max-width:1240px){.gs-row{grid-template-columns:1fr}}
 .gs-row>*{min-width:0}.gs-row .card{margin:0}
 .gs-mx-card{margin-bottom:0}
 .gs-mx-card .mx-tbl{font-size:11px}
 .gs-mx-card .mx-tbl th,.gs-mx-card .mx-tbl td{padding:6px 5px}
-#gradeStepTable .gs-bar{min-width:84px;flex-direction:column-reverse;align-items:stretch;height:auto;gap:3px;padding:2px 0}
-#gradeStepTable .gs-tr{flex:none;width:100%;height:6px;margin:0}
-#gradeStepTable .gs-bar b{min-width:0}
+#gradeStepTable .gs-t{font-size:12.5px}
+#gradeStepTable .gs-t th{padding:7px 8px}
+#gradeStepTable .gs-t td{padding:6px 6px;white-space:nowrap}
+#gradeStepTable .gs-t th{padding:7px 6px}
+#gradeStepTable .gs-d{display:inline;font-size:11px}
+#gradeStepTable .badge{font-size:10.5px;padding:1px 5px}
+.gs-per{font-weight:600;color:var(--sub);font-variant-numeric:tabular-nums}.gs-per.hi{color:#127a45;font-weight:700}
+.badge.gs-pj{background:#f0ecfe;color:#7a5af5}
+@media (max-width:1400px){#gradeStepTable .gs-avg{display:none}}
 #gradeStepTable .card-h{flex-wrap:wrap;gap:4px}
 .gs-help{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .gs-help>summary{cursor:pointer;list-style:none;padding:10px 14px;font-size:13px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px}
@@ -2771,20 +2781,19 @@ function renderGradeSide(T, old){
   let t='<div class="card"><div class="card-h"><h2><span class="ib c1">'+ICO.list+'</span>인터넷 = TV 로 늘릴 때</h2>'
     + '<span class="hint">이번 구간 건당 = 늘어난 금액 ÷ 늘어난 건수 · <b class="gs-k">초록</b>은 평균보다 한 건 값어치가 큰 구간</span></div>'
     + '<div class="tw" style="max-height:none"><table class="t gs-t"><thead><tr>'
-    + '<th>인터넷 = TV</th><th class="n">지급총액<br><small>앞 구간보다</small></th>'
+    + '<th>인터넷=TV</th><th class="n">지급총액<br><small>만원 · 앞 구간보다</small></th>'
     + '<th class="n gs-pc">이번 구간<br><small>번들 1건당</small></th>'
-    + '<th class="n">평균<br><small>번들 1건당</small></th></tr></thead><tbody>'
+    + '<th class="n gs-avg">평균<br><small>번들 1건당</small></th></tr></thead><tbody>'
     + rows.map(r=>{
         const isCur=r.n===mark, isNext=r.n===nextN;
         const hi=r.per!=null && r.per>r.unit;   // 이 구간 한 건이 평균보다 값어치가 큼
         return '<tr class="'+(isCur?'flag':'')+(isNext?' gs-next':'')+'"><td'+(isCur?' class="b"':'')+'>'+fmtN(r.n)+'건'
           + (isCur?' <span class="badge blue">지금</span>':'')+(isNext?' <span class="badge gs-nb">다음</span>':'')
-          + (r.n===projN?'<small class="gs-pjt" title="지금 속도대로면 월말에 닿는 구간 (인터넷·TV 중 낮은 쪽 기준)">▲ 월말 예상</small>':'')+'</td>'
-          + '<td class="n">'+man(r.tw)+(r.d==null?'':'<small class="gs-d">+'+man(r.d)+'</small>')+'</td>'
+          + (r.n===projN?' <span class="badge gs-pj" title="지금 속도대로면 월말에 닿는 구간 (인터넷·TV 중 낮은 쪽 기준)">예상</span>':'')+'</td>'
+          + '<td class="n">'+fmtN(Math.round(r.tw/10000))+(r.d==null?'':' <small class="gs-d">+'+fmtN(Math.round(r.d/10000))+'</small>')+'</td>'
           + '<td class="n gs-pc">'+(r.per==null?'<span class="dim">—</span>'
-              : '<div class="gs-bar" title="'+man(r.d)+' ÷ '+fmtN(r.dn)+'건"><span class="gs-tr"><i style="width:'+Math.max(6,Math.round(r.per/maxPer*100))+'%" class="'+(hi?'hi':'')+'"></i></span>'
-                + '<b class="'+(hi?'hi':'')+'">'+fmtN(r.per)+'</b></div>')+'</td>'
-          + '<td class="n dimn">'+fmtN(r.unit)+'</td></tr>';
+              : '<b class="gs-per'+(hi?' hi':'')+'" title="'+man(r.d)+' ÷ '+fmtN(r.dn)+'건 · 평균 '+fmtN(r.unit)+'원">'+fmtN(r.per)+'</b>')+'</td>'
+          + '<td class="n dimn gs-avg">'+fmtN(r.unit)+'</td></tr>';
       }).join('')
     + '</tbody></table></div></div>';
   ds.innerHTML=h;
@@ -4604,17 +4613,17 @@ async function renderBoard(){
       +'<em>'+(share&&shareTot? 'SKYLIFE 전체 '+fmtN(shareTot)+'건 중 '+(Math.round(ours/shareTot*1000)/10)+'%' : (wl?'':'워크라인 자료 없음'))+'</em></div>'
     + '</div></div>';
 
-  // ① 부족액
+  // ① 부족액 · ② 추이 : 두 칸
+  h+='<div class="bd-row">';
   const show=_boardAll? withGap : withGap.slice(0,8);
-  const maxAbs=Math.max(1,...withGap.map(r=>Math.abs(r.gap)));
   h+='<div class="card"><div class="card-h"><h2><span class="ib c2">'+ICO.grid+'</span>① 시장 대비 부족액</h2>'
     +'<span class="hint">우리 = 정책 합 + 상품권 + 그레이드'+(selIN&&selTV?' ('+fmtN(selIN)+'×'+fmtN(selTV)+')':'')+'</span></div>';
   if(!withGap.length) h+='<div class="none">이 달 시장가가 없습니다. <a href="#" onclick="cmSetTab(\'input\');return false">시장가 입력</a>에서 넣거나 상부정책에서 불러오세요.</div>';
   else{
-    h+='<div class="tw" style="max-height:none"><table class="t bd-gap"><thead><tr><th>상품</th><th class="n">우리</th><th class="n">시장 최고</th><th class="n" style="min-width:150px">차이</th></tr></thead><tbody>'
+    h+='<div class="tw" style="max-height:none"><table class="t bd-gap"><thead><tr><th>상품</th><th class="n">우리</th><th class="n">시장 최고</th><th class="n">차이</th></tr></thead><tbody>'
      + show.map(r=>'<tr><td>'+esc(r.label)+'</td><td class="n" title="정책·상품권 '+fmtN(r.base)+' + 그레이드 '+fmtN(r.grade)+'">'+fmtN(r.our)+'</td>'
         +'<td class="n">'+fmtN(r.mkt)+'<small class="bd-by">'+esc(r.by.length>2? r.by.length+'곳' : r.by.join('·'))+'</small></td>'
-        +'<td class="n"><div class="bd-bar"><span><i class="'+(r.gap<0?'neg':'pos')+'" style="width:'+Math.max(3,Math.round(Math.abs(r.gap)/maxAbs*100))+'%"></i></span><b class="'+(r.gap<0?'cn':'cp')+'">'+(r.gap>0?'+':'')+fmtN(r.gap)+'</b></div></td></tr>').join('')
+        +'<td class="n"><b class="'+(r.gap<0?'cn':'cp')+'">'+(r.gap>0?'+':'')+fmtN(r.gap)+'</b></td></tr>').join('')
      + '</tbody></table></div>'
      + (withGap.length>8? '<button class="ghost sm" style="margin-top:8px" onclick="_boardAll=!_boardAll;renderBoard()">'+(_boardAll?'접기':'전체 '+withGap.length+'개 보기')+'</button>' : '');
   }
@@ -4627,19 +4636,24 @@ async function renderBoard(){
   if(!months.length) h+='<div class="none">아직 쌓인 달이 없습니다</div>';
   else{
     const tg=Object.fromEntries(months.map(m=>[m,trendGap(m)]));
-    const maxR=Math.max(1,...months.map(m=>{ const v=wl&&wl.months&&wl.months[m]; return v? (v.rcvIN||0)+(v.rcvTV||0):0; }));
-    h+='<div class="tw" style="max-height:none"><table class="t bd-tr"><thead><tr><th></th>'+months.map(m=>'<th class="n">'+(+m.slice(5))+'월</th>').join('')+'</tr></thead><tbody>'
-     + '<tr><td>시장 최고가 대비 평균<br><small class="dim">그레이드 제외</small></td>'+months.map(m=>{ const t=tg[m]; return '<td class="n">'+(t? '<b class="'+(t.avg<0?'cn':'cp')+'">'+(t.avg>0?'+':'')+fmtMan(t.avg)+'</b>' : '<span class="dim">—</span>')+'</td>'; }).join('')+'</tr>'
-     + '<tr><td>최고가 상부</td>'+months.map(m=>'<td class="n">'+(tg[m]&&tg[m].lead? esc(tg[m].lead):'<span class="dim">—</span>')+'</td>').join('')+'</tr>'
-     + '<tr><td>우리 코드 접수<br><small class="dim">인터넷+TV</small></td>'+months.map(m=>{ const v=wl&&wl.months&&wl.months[m]; if(!v) return '<td class="n"><span class="dim">—</span></td>';
-          const n=(v.rcvIN||0)+(v.rcvTV||0); return '<td class="n"><div class="bd-col"><i style="height:'+Math.max(2,Math.round(n/maxR*36))+'px"></i></div><b>'+fmtN(n)+'</b></td>'; }).join('')+'</tr>'
-     + '<tr><td>우리 코드 개통<br><small class="dim">인터넷 / TV</small></td>'+months.map(m=>{ const v=wl&&wl.months&&wl.months[m]; return '<td class="n">'+(v? fmtN(v.opIN||0)+' / '+fmtN(v.opTV||0) : '<span class="dim">—</span>')+'</td>'; }).join('')+'</tr>'
-     + (wl&&wl.share? '<tr><td>SKYLIFE 접수 중<br>우리 코드 비중</td>'+months.map(m=>{ const s=wl.share[m]; if(!s) return '<td class="n"><span class="dim">—</span></td>'; const t=Object.values(s).reduce((a,b)=>a+b,0);
-          return '<td class="n">'+(t? (Math.round((s[wl.upper]||0)/t*1000)/10)+'%':'—')+'</td>'; }).join('')+'</tr>' : '')
+    const sh=m=>{ const s=wl&&wl.share&&wl.share[m]; if(!s) return null; const t=Object.values(s).reduce((a,b)=>a+b,0); return t? Math.round((s[wl.upper]||0)/t*1000)/10 : null; };
+    const dash='<span class="dim">—</span>';
+    h+='<div class="tw" style="max-height:none"><table class="t bd-tr"><thead><tr><th>월</th>'
+     + '<th class="n">시장 대비<br><small>그레이드 제외</small></th><th>최고가 상부</th>'
+     + '<th class="n">접수<br><small>인터넷 / TV</small></th><th class="n">개통<br><small>인터넷 / TV</small></th>'
+     + (wl&&wl.share? '<th class="n">SKYLIFE<br><small>중 우리 비중</small></th>':'')+'</tr></thead><tbody>'
+     + months.slice().reverse().map(m=>{ const t=tg[m], v=wl&&wl.months&&wl.months[m], p=sh(m);
+         return '<tr><td><b>'+(+m.slice(5))+'월</b></td>'
+           + '<td class="n">'+(t? '<b class="'+(t.avg<0?'cn':'cp')+'">'+(t.avg>0?'+':'')+fmtMan(t.avg)+'</b>' : dash)+'</td>'
+           + '<td>'+(t&&t.lead? esc(t.lead) : dash)+'</td>'
+           + '<td class="n">'+(v? fmtN(v.rcvIN||0)+' / '+fmtN(v.rcvTV||0) : dash)+'</td>'
+           + '<td class="n">'+(v? fmtN(v.opIN||0)+' / '+fmtN(v.opTV||0) : dash)+'</td>'
+           + (wl&&wl.share? '<td class="n">'+(p==null? dash : p+'%')+'</td>' : '')+'</tr>'; }).join('')
      + '</tbody></table></div>';
   }
   h+='<div class="foot-note"><span>단가는 그 달 수수료표와 시장가 입력 값으로 계산합니다. 접수 · 개통은 워크라인 전체 고객관리에서 상부점 <b>1.유SKY-우리</b> 건만 센 숫자입니다.'
     + '</span></div></div>';
+  h+='</div>';   // /bd-row
 
   // ③ 판단 이력
   const top=(_decisions||[]).filter(d=>!d.parent_id);
