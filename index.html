@@ -746,6 +746,51 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 .gv-leg>span>i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-2px;margin-right:4px}
 .gv-leg i:not(.u):not(.d){width:30px;height:18px}
 .nx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 한 단계 더 가면 : 건당 단가 */
+.nx-v2>div{gap:1px;position:relative}
+.nx-v2 .q{font-size:12px!important;color:var(--text)}
+.nx-v2 .cp{font-size:15px!important}
+.nx-per{display:flex;flex-direction:column;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line2)}
+.nx-per em{font-style:normal;font-size:11px;color:var(--sub)}
+.nx-per strong{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text);line-height:1.25}
+.nx-v2 .nx-x{white-space:nowrap}
+.gs-d{display:block;font-size:11px;color:var(--green);font-weight:600}
+.nx-v2 .nx-x b{font-size:12px;color:var(--green)}.nx-v2 .nx-x b.lo{color:var(--up)}
+.nx-pace{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.nx-pace small{white-space:normal!important;line-height:1.4;color:var(--text);font-size:11.5px}
+.nx-pace small .dim{font-size:11px;white-space:normal}
+.nx .nx-pace small b{font-size:12px;font-weight:700}
+.pc{font-style:normal;display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;white-space:nowrap}
+.nx-pace .pc{align-self:flex-start}
+.pc.done{background:#e8eefc;color:#3b6fe0}.pc.ok{background:#e3f6ea;color:#127a45}
+.pc.tight{background:#fff3dc;color:#a8650a}.pc.hard{background:#fdecec;color:#c8373c}
+.nx-v2>div.pv-ok{box-shadow:inset 0 0 0 1.5px #a7e0c0}.nx-v2>div.pv-tight{box-shadow:inset 0 0 0 1.5px #f3d39a}
+.pace-h{background:var(--soft);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--sub);display:flex;flex-direction:column;gap:6px}
+.pace-h.none{display:block;line-height:1.5}.pace-h a{color:var(--down);font-weight:600}
+.pace-h .pt{display:flex;align-items:center;gap:4px;flex-wrap:wrap;color:var(--text)}
+.pace-h .pr{display:grid;grid-template-columns:40px 1fr auto;grid-template-rows:auto auto;column-gap:8px;align-items:center}
+.pace-h .pn{font-weight:600;color:var(--text)}
+.pace-h .pb{position:relative;height:8px;border-radius:4px;background:#e6e9ef}
+.pace-h .pb i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#5c8ff0}
+.pace-h .pb s{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#bcd0fa;text-decoration:none}
+.pace-h .pd b.ok{color:#127a45}.pace-h .pd b.no{color:#c8373c}
+.pace-h .pv{font-variant-numeric:tabular-nums}.pace-h .pv b{color:var(--text)}
+.pace-h .pd{grid-column:2/4;font-size:11px;color:var(--dim)}
+.gs-pjt{display:block;font-size:10.5px;font-weight:700;color:#7a5af5;margin-top:1px}
+.foot-note .pc{font-size:10.5px;padding:0 5px}
+.nx-v2{margin-top:2px}
+.gs-t th small{font-weight:400}
+.gs-t td.dimn{color:var(--sub)}
+.gs-bar{position:relative;display:flex;align-items:center;justify-content:flex-end;min-width:110px;height:22px;padding-right:2px}
+.gs-bar b{z-index:1}
+.gs-tr{flex:1;height:8px;border-radius:4px;background:#f1f3f6;margin-right:8px;overflow:hidden;display:block}
+.gs-bar i{display:block;height:100%;border-radius:4px;background:#cfd5de}
+.gs-bar i.hi{background:#5cc08e}
+.gs-bar b{min-width:58px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--sub)}
+.gs-bar b.hi{color:#127a45;font-weight:700}
+.gs-next td{background:#f3fbf6}
+.badge.gs-nb{background:#e3f6ea;color:#127a45}
+.gs-k{color:#127a45}
 .nx span{white-space:nowrap}
 body.readonly #copy-bar{display:none!important}
 body.readonly .ft-tools .ghost,body.readonly .ft-tools .ft-sep{display:none}
@@ -2453,7 +2498,59 @@ function renderGrade(){
 function pickIN(iv){ hlIN=(hlIN===iv?null:iv); renderGrade(); }
 function pickTV(tv){ hlTV=(hlTV===tv?null:tv); renderGrade(); }
 
+/* ── 진행 속도 : 지금 실적 · 남은 일수로 '닿을 수 있는가' ─────────
+   기준일 = 이 달 어드민 자료를 올린 날(있으면), 없으면 오늘. 달력 일수 기준.
+   하루 속도 = 실적 ÷ 지난 일수, 필요 속도 = 남은 건수 ÷ 남은 일수 */
+const PACE_OK=1.0, PACE_TIGHT=1.3;   // 필요 속도가 지금 속도의 1.3배 이하면 '조금 더', 넘으면 '무리'
+function gradePace(){
+  const ym=curMonthKey(); if(!ym) return null;
+  const [Y,M]=ym.split('-').map(Number), dim=new Date(Y,M,0).getDate();
+  const now=new Date(), nowYm=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(ym>nowYm) return {state:'future'};
+  if(actualIN==null&&actualTV==null) return {state:'noact', ym, closed: ym<nowYm};
+  if(ym<nowYm) return {state:'closed', ym, aIN:actualIN||0, aTV:actualTV||0};
+  let asOf=now, src='오늘';
+  const st=SKY.settings&&SKY.settings['settle:'+ym];
+  if(st&&st.at){ const d=new Date(st.at); if(!isNaN(d)&&d<=now&&(d.getMonth()+1)===M){ asOf=d; src='어드민 자료 반영일'; } }
+  const day=asOf.getDate(), left=Math.max(0,dim-day);
+  const aIN=actualIN||0, aTV=actualTV||0;
+  return {state:'live', ym, dim, day, left, src, aIN, aTV,
+          vIN:day? aIN/day:0, vTV:day? aTV/day:0,
+          pIN:Math.round(aIN+(day? aIN/day:0)*left), pTV:Math.round(aTV+(day? aTV/day:0)*left)};
+}
+/* 목표 tIN × tTV 에 대해 : 남은 건수, 하루 필요, 지금 속도 대비 몇 배 → 상태 */
+function paceFor(P,tIN,tTV){
+  if(!P||P.state!=='live') return null;
+  const one=(a,t,v)=>{
+    const need=Math.max(0,t-a);
+    if(!need) return {need:0, per:0, x:0};
+    if(!P.left) return {need, per:Infinity, x:Infinity};
+    const per=need/P.left; return {need, per, x: v>0? per/v : Infinity};
+  };
+  const i=one(P.aIN,tIN,P.vIN), t=one(P.aTV,tTV,P.vTV);
+  const x=Math.max(i.x,t.x);
+  const lv= (i.need===0&&t.need===0)? 'done' : x<=PACE_OK? 'ok' : x<=PACE_TIGHT? 'tight' : 'hard';
+  return {i,t,x,lv};
+}
+function paceChip(r){
+  if(!r) return '';
+  const L={done:['done','이미 달성'], ok:['ok','도달 가능'], tight:['tight','조금 더 필요'], hard:['hard','어려움']}[r.lv];
+  return '<i class="pc '+L[0]+'">'+L[1]+'</i>';
+}
+function paceLine(r,P){
+  if(!r||r.lv==='done') return '';
+  const f=v=> v===Infinity? '—' : (Math.round(v*10)/10).toLocaleString();
+  // 더 빠듯한 쪽 하나만 보여준다 (둘 다 늘려야 하면 빠듯한 쪽이 판단을 정한다)
+  const useTV= r.t.x>r.i.x || (r.t.x===r.i.x && r.t.need>r.i.need);
+  const o=useTV? r.t : r.i, nm=useTV? 'TV':'인터넷', v=useTV? P.vTV : P.vIN;
+  return nm+' 하루 <b>'+f(o.per)+'건</b> 필요<br><span class="dim">지금 하루 '+f(v)+'건 · '+fmtN(o.need)+'건 남음</span>';
+}
+
 /* ── 오른쪽 : 지금 칸에서 한 단계 더 ─────────────────────── */
+/* 건당 기준을 하나로 맞춘다
+   · 인터넷만 → 인터넷 1건당, TV만 → TV 1건당, 둘 다 → 번들(인터넷+TV) 1건당
+   · '이번 구간 건당' = 늘어난 금액 ÷ 늘어난 건수 (계산식을 화면에 같이 보여준다)
+   · '지금 평균' = 지금 지급총액을 55:45로 나눠 건수로 나눈 값 → 몇 배인지로 바로 비교 */
 function renderGradeSide(T, old){
   const ds=document.getElementById('gradeDiffSection'); if(!ds) return;
   const L=(a,b)=>T[a+'_'+b]||null;
@@ -2461,14 +2558,21 @@ function renderGradeSide(T, old){
   if(!(a&&b)||old){ a=floorIN(goalIN)||300; b=floorTV(goalTV)||300; from=goalIN?'본부 목표':'기준 300×300'; }
   const won=(x,y)=>(L(x,y)||0)*10000;
   const cur=won(a,b);
-  const step=(na,nb)=>{
+  const avgIN=cur? Math.round(cur*.55/a):0, avgTV=cur? Math.round(cur*.45/b):0, avgBo=avgIN+avgTV;
+  const step=(na,nb,unitN,avg)=>{
     if(!na||!nb||!L(na,nb)) return null;
-    const d=won(na,nb)-cur, n=(na-a)+(nb-b);
-    return {na,nb,d,n,per:n?Math.round(d/n):null};
+    const d=won(na,nb)-cur, n=unitN(na,nb);
+    const per=n? Math.round(d/n):null;
+    return {na,nb,d,n,per,avg,x: (avg&&per)? per/avg : null};
   };
-  const sIN=step(IN_ALL.find(v=>v>a&&L(v,b)), b);
-  const sTV=step(a, TV_ALL.find(v=>v>b&&L(a,v)));
-  const sBo=step(IN_ALL.find(v=>v>a), TV_ALL.find(v=>v>b));
+  const nIN=IN_ALL.find(v=>v>a&&L(v,b)), nTV=TV_ALL.find(v=>v>b&&L(a,v));
+  const sIN=step(nIN, b, (na)=>na-a, avgIN);
+  const sTV=step(a, nTV, (na,nb)=>nb-b, avgTV);
+  // 둘 다 : 인터넷·TV를 같은 건수씩 늘리는 다음 칸 → 번들 1건 = 인터넷 1 + TV 1
+  let bo=null;
+  for(const v of IN_ALL){ if(v>a && TV_ALL.includes(b+(v-a)) && L(v,b+(v-a))){ bo=v; break; } }
+  const sBo= bo? step(bo, b+(bo-a), (na)=>na-a, avgBo) : null;
+  const P=gradePace();
 
   // 1:1 로 늘릴 때 (인터넷 = TV)
   const both=IN_ALL.filter(n=>TV_ALL.includes(n));
@@ -2476,31 +2580,77 @@ function renderGradeSide(T, old){
   both.forEach(n=>{
     const man=L(n,n); if(!man) return;
     const tw=man*10000, r={n, tw, unit:Math.round(tw*.55/n)+Math.round(tw*.45/n)};
-    if(prev){ r.d=tw-prev.tw; r.per=Math.round(r.d/(n-prev.n)); }
+    if(prev){ r.d=tw-prev.tw; r.dn=n-prev.n; r.per=Math.round(r.d/r.dn); }
     rows.push(r); prev=r;
   });
   const mark=Math.min(a,b);
+  const nextN=(rows.find(r=>r.n>mark)||{}).n;
+  const projN= P&&P.state==='live'? ((rows.filter(r=>r.n<=Math.min(P.pIN,P.pTV)).pop())||{}).n : null;
+  const maxPer=Math.max(1,...rows.map(r=>r.per||0));
+  const man=v=>fmtN(Math.round(v/10000))+'만원';
 
-  const card=(label,s)=> !s
+  const card=(label,unitLbl,s,cntTxt)=> !s
     ? '<div class="none"><span>'+label+'</span><b>더 오를 구간 없음</b></div>'
-    : '<div><span>'+label+' <b style="font-size:12px;color:var(--text)">+'+fmtN(s.n)+'건</b></span>'
-      + '<b class="cp">+'+fmtN(Math.round(s.d/10000))+'만원</b><small title="'+fmtN(s.na)+' × '+fmtN(s.nb)+'">총 '+fmtN(Math.round((cur+s.d)/10000))+'만원</small></div>';
+    : (()=>{ const r=paceFor(P,s.na,s.nb);
+      return '<div class="'+(r?'pv-'+r.lv:'')+'" title="'+fmtN(a)+'×'+fmtN(b)+' → '+fmtN(s.na)+'×'+fmtN(s.nb)+' · 총 '+man(cur+s.d)
+        +'&#10;'+unitLbl+' = '+man(s.d)+' ÷ '+fmtN(s.n)+'건 = '+fmtN(s.per)+'원">'
+      + '<span>'+label+' <b class="q">'+cntTxt+'</b></span>'
+      + '<b class="cp">+'+man(s.d)+'</b>'
+      + '<div class="nx-per"><em>'+unitLbl+'</em><strong>'+fmtN(s.per)+'원</strong></div>'
+      + (r? '<div class="nx-pace">'+paceChip(r)+'<small>'+paceLine(r,P)+'</small></div>' : '')
+      + '</div>'; })();
 
   let h='<div class="card" style="margin:0">'
     + '<div class="card-h"><h2><span class="ib c3">'+ICO.chart+'</span>한 단계 더 가면</h2></div>'
-    + '<p class="sub" style="margin:-4px 0 12px">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+fmtN(Math.round(cur/10000))+'만원</b></p>'
-    + '<div class="nx">'+card('인터넷만', sIN)+card('TV만', sTV)+card('둘 다', sBo)+'</div>'
-    + '<div class="tw" style="max-height:430px"><table class="t"><thead><tr>'
-    + '<th>인터넷 = TV</th><th class="n">지급총액</th><th class="n">앞 구간보다</th>'
-    + '<th class="n">번들 건당<br><small style="font-weight:400">평균</small></th></tr></thead><tbody>'
-    + rows.map(r=>'<tr'+(r.n===mark?' class="flag"':'')+'><td'+(r.n===mark?' class="b"':'')+'>'+fmtN(r.n)+'건'+(r.n===mark?' <span class="badge blue">지금</span>':'')+'</td>'
-        + '<td class="n">'+fmtN(Math.round(r.tw/10000))+'만원</td>'
-        + '<td class="n">'+(r.d==null?'<span class="dim">—</span>':'<span class="cp">+'+fmtN(Math.round(r.d/10000))+'만원</span>')+'</td>'
-        + '<td class="n">'+fmtN(r.unit)+'</td></tr>').join('')
+    + '<p class="sub" style="margin:-4px 0 10px">'+from+' <b>'+fmtN(a)+' × '+fmtN(b)+'</b> · 지금 지급총액 <b>'+man(cur)+'</b></p>'
+    + paceHead(P,a,b)
+    + '<div class="nx nx-v2">'
+      + card('인터넷만','인터넷 1건당',sIN, sIN?'+'+fmtN(sIN.n)+'건':'')
+      + card('TV만','TV 1건당',sTV, sTV?'+'+fmtN(sTV.n)+'건':'')
+      + card('둘 다','번들 1건당',sBo, sBo?'각 +'+fmtN(sBo.n)+'건':'')
+    + '</div>'
+    + '<div class="tw" style="max-height:430px"><table class="t gs-t"><thead><tr>'
+    + '<th>인터넷 = TV</th><th class="n">지급총액<br><small>앞 구간보다</small></th>'
+    + '<th class="n gs-pc">이번 구간<br><small>번들 1건당</small></th>'
+    + '<th class="n">평균<br><small>번들 1건당</small></th></tr></thead><tbody>'
+    + rows.map(r=>{
+        const isCur=r.n===mark, isNext=r.n===nextN;
+        const hi=r.per!=null && r.per>r.unit;   // 이 구간 한 건이 평균보다 값어치가 큼
+        return '<tr class="'+(isCur?'flag':'')+(isNext?' gs-next':'')+'"><td'+(isCur?' class="b"':'')+'>'+fmtN(r.n)+'건'
+          + (isCur?' <span class="badge blue">지금</span>':'')+(isNext?' <span class="badge gs-nb">다음</span>':'')
+          + (r.n===projN?'<small class="gs-pjt" title="지금 속도대로면 월말에 닿는 구간 (인터넷·TV 중 낮은 쪽 기준)">▲ 월말 예상</small>':'')+'</td>'
+          + '<td class="n">'+man(r.tw)+(r.d==null?'':'<small class="gs-d">+'+man(r.d)+'</small>')+'</td>'
+          + '<td class="n gs-pc">'+(r.per==null?'<span class="dim">—</span>'
+              : '<div class="gs-bar" title="'+man(r.d)+' ÷ '+fmtN(r.dn)+'건"><span class="gs-tr"><i style="width:'+Math.max(6,Math.round(r.per/maxPer*100))+'%" class="'+(hi?'hi':'')+'"></i></span>'
+                + '<b class="'+(hi?'hi':'')+'">'+fmtN(r.per)+'</b></div>')+'</td>'
+          + '<td class="n dimn">'+fmtN(r.unit)+'</td></tr>';
+      }).join('')
     + '</tbody></table></div>'
-    + '<div class="foot-note"><span>우리 목표는 인터넷과 TV가 1:1이라 둘을 같이 늘릴 때를 기준으로 줄 세웠습니다. '
-    + '<b>번들 건당</b>은 지급총액을 전체 건수에 고르게 나눈 값입니다.</span></div></div>';
+    + '<div class="foot-note"><span><b>도달 판단</b> = 남은 건수 ÷ 남은 일수(달력 기준)를 지금까지의 하루 평균과 비교. '
+    + '지금 속도 이하면 <i class="pc ok">도달 가능</i>, '+PACE_TIGHT+'배까지 <i class="pc tight">조금 더 필요</i>, 그 위는 <i class="pc hard">어려움</i>.<br>'
+    + '<b>이번 구간 건당</b> = 늘어난 금액 ÷ 늘어난 건수. '
+    + '<b class="gs-k">초록 막대</b>는 평균보다 한 건 값어치가 큰 구간이에요. '
+    + '<b>더 하는 건수에만</b> 쓰는 비용(프로모션·추가 단가)이 건당 이 금액보다 적으면, 그레이드만으로도 남습니다.</span></div></div>';
   ds.innerHTML=h;
+}
+function paceHead(P,a,b){
+  if(!P) return '';
+  if(P.state==='future') return '';
+  if(P.state==='noact') return '<div class="pace-h none">'+(P.closed?'이 달 실적이 입력되지 않았습니다.':'실적 건수가 없어 남은 기간 안에 닿을 수 있는지는 계산하지 않았습니다.')
+      +' <a href="#" onclick="go(\'goal\');return false">실적 입력</a> 또는 어드민 자료를 올리면 표시됩니다.</div>';
+  if(P.state==='closed') return '<div class="pace-h">'+ymLabel(P.ym)+' 마감 · 최종 실적 인터넷 <b>'+fmtN(P.aIN)+'</b> · TV <b>'+fmtN(P.aTV)+'</b>건</div>';
+  const f=v=>(Math.round(v*10)/10).toLocaleString();
+  const r=paceFor(P,a,b);
+  const ln=(nm,act,v,pj,t)=>'<div class="pr"><span class="pn">'+nm+'</span>'
+      + '<span class="pb" title="진한 막대 = 지금 실적, 옅은 막대 = 이대로 가면 월말 예상"><s style="width:'+Math.min(100,Math.round(pj/Math.max(t,1)*100))+'%"></s>'
+      + '<i style="width:'+Math.min(100,Math.round(act/Math.max(t,1)*100))+'%"></i></span>'
+      + '<span class="pv"><b>'+fmtN(act)+'</b> / '+fmtN(t)+'</span>'
+      + '<span class="pd">하루 '+f(v)+'건 · 월말 예상 <b class="'+(pj>=t?'ok':'no')+'">'+fmtN(pj)+'</b></span></div>';
+  return '<div class="pace-h">'
+    + '<div class="pt"><b>'+(+P.ym.slice(5))+'월 '+P.day+'일</b> 기준 <span class="dim">('+P.src+')</span> · 남은 <b>'+P.left+'일</b>'
+    + '<span style="margin-left:auto">'+fmtN(a)+'×'+fmtN(b)+' '+paceChip(r)+'</span></div>'
+    + ln('인터넷',P.aIN,P.vIN,P.pIN,a) + ln('TV',P.aTV,P.vTV,P.pTV,b)
+    + '</div>';
 }
 function renderDiffTable(){ renderGrade(); }
 
