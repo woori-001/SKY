@@ -844,8 +844,16 @@ body.mode-report .sb *{scrollbar-color:rgba(255,255,255,.35) transparent}
 .gs-top .nx-v2{margin-bottom:0}
 .gs-top .nx-v2{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 @media (max-width:1180px){.gs-top{grid-template-columns:1fr}}
-.gs-mx-card{margin-bottom:16px}
-.gs-mx-card .mx-tbl{font-size:11.5px}
+.gs-row{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,4fr);gap:16px;align-items:start}
+@media (max-width:1100px){.gs-row{grid-template-columns:1fr}}
+.gs-row>*{min-width:0}.gs-row .card{margin:0}
+.gs-mx-card{margin-bottom:0}
+.gs-mx-card .mx-tbl{font-size:11px}
+.gs-mx-card .mx-tbl th,.gs-mx-card .mx-tbl td{padding:6px 5px}
+#gradeStepTable .gs-bar{min-width:84px;flex-direction:column-reverse;align-items:stretch;height:auto;gap:3px;padding:2px 0}
+#gradeStepTable .gs-tr{flex:none;width:100%;height:6px;margin:0}
+#gradeStepTable .gs-bar b{min-width:0}
+#gradeStepTable .card-h{flex-wrap:wrap;gap:4px}
 .gs-help{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .gs-help>summary{cursor:pointer;list-style:none;padding:10px 14px;font-size:13px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px}
 .gs-help>summary::-webkit-details-marker{display:none}
@@ -1096,6 +1104,7 @@ window.SKY_CONFIG = {
       <div class="strip"><div class="gv" id="gv" style="width:100%"></div><span hidden id="mx-ver-label"></span></div>
       <div id="gv-old"></div>
       <div id="gradeDiffSection"></div>
+      <div class="gs-row">
       <div class="card gs-mx-card">
         <div class="card-h"><h2><span class="ib c2"><svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12M2 10h12M6 2v12M10 2v12"/></svg></span>그레이드 표</h2><span class="hint">칸을 누르면 그 달 그레이드 목표로 정합니다</span></div>
         <div class="matrix-wrap">
@@ -1103,6 +1112,7 @@ window.SKY_CONFIG = {
         </div>
       </div>
       <div id="gradeStepTable"></div>
+      </div>
     </div>
 
     <!-- ── 분석 통합 ── -->
@@ -1581,7 +1591,7 @@ function rerenderForAuth(){
   try{
     const pg=(document.querySelector('.page.on')||{}).id||'';
     if(pg==='page-table') renderTable();
-    else if(pg==='page-compare'){ renderCompare(); polCheck(); if(cmTab==='board') renderBoard(); }
+    else if(pg==='page-compare'){ renderCompare(); polStripRefresh(); if(cmTab==='board') renderBoard(); }
     else if(pg==='page-grade') renderGrade();
   }catch(e){ console.warn(e); }
   wlFlush();
@@ -1864,6 +1874,7 @@ async function sbSaveCompareNow(){
   const rows=ids.map(id=>({source_id:id, month:ym, vals:SKY.cmpVals[id]||{}, updated_by:userLabel(sbUser)}));
   const {error}=await sb.from('sky_compare_values').upsert(rows,{onConflict:'source_id,month'});
   if(error){ setSyncDot('error','저장 실패'); showGsStatus('⚠ 저장 실패 — '+error.message,false); return false; }
+  if(typeof _cmpAll!=='undefined') _cmpAll=null;   // 판단 보드 추이를 다시 계산하게
   ids.forEach(id=>_cmpDirty.delete(id));
   setSyncDot('ok','마지막 저장 '+new Date().toLocaleTimeString('ko-KR')); showSaved();
   return true;
@@ -1923,7 +1934,7 @@ document.addEventListener('focusout',()=>{
 function rerenderAll(){
   renderTable(); renderGrade(); renderSideInfo();
   const on=(document.querySelector('.page.on')||{}).id||'';
-  if(on==='page-compare'){ renderCompare(); renderHeadroom(); }
+  if(on==='page-compare'){ renderCompare(); renderHeadroom(); if(typeof polStripRefresh==='function'){ _polInfo=null; polStripRefresh(); if(cmTab==='board') renderBoard(); } }
   if(on.startsWith('page-r')) initReport();
   if(on==='page-goal') renderGoal();
   if(on==='page-history') renderHistory();
@@ -4179,7 +4190,7 @@ function initCompare(){
   if(document.getElementById('cm-tabs')){
     let t=cmTab; try{ t=localStorage.getItem('sky_cmTab')||t; }catch(e){}
     cmSetTab(t==='board'?'board':'input');
-    polCheck();
+    polStripRefresh();
   }
 }
 
@@ -4441,14 +4452,35 @@ function trendGap(ym){
 }
 
 /* ── 워크라인 실적 (북마크로 가져온 건수) ─────────────────────── */
-function wlData(){ return (SKY.settings&&SKY.settings.wl)||null; }
+/* 들어온 자료는 숫자 · 날짜만 남긴다 (주소로 넘어오는 자료라 그대로 믿지 않는다) */
+function wlClean(p){
+  if(!p||p.v!==1||!p.months||typeof p.months!=='object') return null;
+  const at=new Date(p.at); if(isNaN(at)) return null;
+  const K=['rcvIN','rcvTV','opIN','opTV','okIN','okTV','xIN','xTV','pendIN','pendTV'];
+  const n=x=>{ x=Math.round(+x); return Number.isFinite(x)&&x>=0&&x<1e7? x : 0; };
+  const d=x=>{ if(x==null||x==='') return null; x=Math.round(+x); return Number.isFinite(x)? Math.max(0,Math.min(120,x)) : null; };
+  const months={};
+  Object.entries(p.months).forEach(([k,v])=>{ if(/^\d{4}-\d{2}$/.test(k)&&v&&typeof v==='object') months[k]=Object.fromEntries(K.map(f=>[f,n(v[f])])); });
+  const share={};
+  Object.entries(p.share||{}).forEach(([k,v])=>{ if(/^\d{4}-\d{2}$/.test(k)&&v&&typeof v==='object'){ share[k]={}; Object.entries(v).forEach(([u,c])=>{ share[k][String(u).slice(0,60)]=n(c); }); } });
+  const lg=p.lag||{};
+  return {v:1, at:at.toISOString(), upper:WL_UPPER, months, share,
+          lag:{n:n(lg.n), med:d(lg.med), p25:d(lg.p25), p75:d(lg.p75)},
+          by: p.by? String(p.by).slice(0,40) : undefined};
+}
+let _wlRaw=null, _wlCache=null;
+function wlData(){
+  const raw=SKY.settings&&SKY.settings.wl; if(!raw) return null;
+  if(raw!==_wlRaw){ _wlRaw=raw; _wlCache=wlClean(raw); }
+  return _wlCache;
+}
 
 /* ── 판단 이력 ─────────────────────────────────────────────── */
 let _decisions=null, _decErr='';
 const DEC_KINDS=['유지','이관','보류','본사 단가 요청','재개'];
 async function loadDecisions(){
   const {data,error}=await sb.from('sky_decisions').select('*').order('created_at',{ascending:false}).limit(300);
-  if(error){ _decErr=error.message; _decisions=_decisions||[]; return; }
+  if(error){ _decErr=error.message; return; }
   _decErr=''; _decisions=data||[];
 }
 function decSnapshot(){
@@ -4461,7 +4493,7 @@ function decSnapshot(){
     wl: wl? {at:wl.at, months:Object.fromEntries(Object.entries(wl.months||{}).slice(-4).map(([k,v])=>[k,{rcv:(v.rcvIN||0)+(v.rcvTV||0),op:(v.opIN||0)+(v.opTV||0)}]))} : null};
 }
 function decAuthorDefault(){
-  if(canEdit()&&sbUser) return userLabel(sbUser);
+  if(canEdit()&&sbUser) return String(userLabel(sbUser)).slice(0,40);
   try{ return localStorage.getItem('sky_decAuthor')||''; }catch(e){ return ''; }
 }
 function openDecisionForm(parentId){
@@ -4549,6 +4581,7 @@ async function renderBoard(){
     try{ await Promise.all([_decisions===null?loadDecisions():null, _cmpAll===null?loadCmpAll():null]); }
     catch(e){ _decErr=_decErr||e.message; _cmpAll=_cmpAll||{}; }
   }
+  if(document.getElementById('cm-board')!==el) return;
   const ym=curMonthKey(), rows=boardRows();
   const withGap=rows.filter(r=>r.gap!=null).sort((a,b)=>a.gap-b.gap);
   const avg=withGap.length? Math.round(withGap.reduce((s,r)=>s+r.gap,0)/withGap.length) : null;
@@ -4610,6 +4643,7 @@ async function renderBoard(){
 
   // ③ 판단 이력
   const top=(_decisions||[]).filter(d=>!d.parent_id);
+  if(_decisions===null&&!_decErr) _decErr='불러오지 못했습니다';
   h+='<div class="card"><div class="card-h"><h2><span class="ib c1">'+ICO.list+'</span>③ 판단 이력</h2>'
     +'<button class="primary sm" onclick="openDecisionForm()">+ 판단 기록</button></div>'
     + (_decErr? '<div class="none">이력을 불러오지 못했습니다: '+esc(_decErr)+'</div>'
@@ -4649,10 +4683,11 @@ function polMap(P){
       (r.c||[]).forEach((c,k)=>{ const v=Array.isArray(c)? c[1] : null; cells.push({ri:p.ri, label:p.label, vendor:vend[k], v:(typeof v==='number'&&v>0)? v : 0}); });
     });
   });
-  return {cells, unmatched, vend};
+  const seen=new Map(); cells.forEach(c=>seen.set(c.vendor+'|'+c.ri, c));
+  return {cells:[...seen.values()], unmatched, vend};
 }
 function polImportInfo(ym){ return (SKY.settings||{})['policy_import:'+ym]||null; }
-async function polCheck(){
+async function polStripRefresh(){
   const el=document.getElementById('pol-strip'); if(!el) return;
   if(!canEdit()){ el.innerHTML='<span class="hint">상부정책(SKY › 유선)에서 시장가를 불러오려면 관리자로 로그인하세요.</span>'; return; }
   const ym=curMonthKey();
@@ -4661,7 +4696,7 @@ async function polCheck(){
   const P=_polInfo, last=polImportInfo(ym);
   if(P.none){ el.innerHTML='<span class="hint">상부정책에 '+(+ym.slice(5))+'월 SKY 단가가 아직 없습니다.</span>'; return; }
   const fresh= !last || last.saved_at!==P.saved_at || last.eff_at!==P.eff_at;
-  el.innerHTML='<span class="pol-ic">⇣</span><span>상부정책 <b>'+esc(P.eff_at.slice(5,16).replace('-','/'))+' 적용분</b> <span class="dim">('+esc(P.author)+' · '+esc(P.saved_at.slice(5).replace('-','/'))+' 저장)</span>'
+  el.innerHTML='<span class="pol-ic">⇣</span><span>상부정책 <b>'+esc(String(P.eff_at||'').slice(5,16).replace('-','/'))+' 적용분</b> <span class="dim">('+esc(P.author||'')+' · '+esc(String(P.saved_at||'').slice(5).replace('-','/'))+' 저장)</span>'
     + (fresh? ' <b class="pol-new">새 단가</b>' : ' <span class="dim">· 불러온 단가와 같음</span>')
     + (last? ' <span class="dim">· 마지막 불러오기 '+esc(fmtWhen(last.at).replace(' 수정',''))+'</span>':'')+'</span>'
     + '<button class="'+(fresh?'primary':'ghost')+' sm" style="margin-left:auto" onclick="polPreview()">불러오기</button>';
@@ -4686,7 +4721,7 @@ function polPreview(){
 }
 async function polApply(){
   const P=_polInfo; if(!P||P.none||!canEdit()) return;
-  if(P.ym!==curMonthKey()){ closeModal(); showGsStatus('⚠ 보는 달이 바뀌어 반영하지 않았습니다 — 다시 불러오세요',false); return; }
+  if(P.ym!==curMonthKey()||SKY.cmpYm!==P.ym||_switching||_monthLoading){ closeModal(); showGsStatus('⚠ 보는 달이 바뀌는 중이라 반영하지 않았습니다 — 다시 불러오세요',false); return; }
   const ns=s=>String(s||'').replace(/\s+/g,'');
   const srcBy=Object.fromEntries((SKY.cmpSrc||[]).map(s=>[ns(s.name),s]));
   const touched=new Set(); let nCell=0;
@@ -4700,8 +4735,8 @@ async function polApply(){
     const ok=await sbSaveCompareNow(); if(ok===false){ showGsStatus('⚠ 시장가 저장 실패 — 다시 시도하세요',false); return; } }
   await sbSaveSetting('policy_import:'+P.ym,{eff_at:P.eff_at, saved_at:P.saved_at, at:new Date().toISOString(), by:userLabel(sbUser), cells:nCell});
   _cmpAll=null;
-  closeModal(); renderCompare(); renderHeadroom(); polCheck();
-  showGsStatus('상부정책 '+P.eff_at.slice(5,10).replace('-','/')+' 적용분을 시장가에 반영했습니다');
+  closeModal(); renderCompare(); renderHeadroom(); polStripRefresh();
+  showGsStatus('상부정책 '+String(P.eff_at||'').slice(5,10).replace('-','/')+' 적용분을 시장가에 반영했습니다');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4715,6 +4750,7 @@ function wlBookmarkletSrc(){
   const code=`(async()=>{
 if(!/workline\\.kr$/.test(location.hostname)){alert('워크라인(workline.kr)에 로그인한 화면에서 눌러주세요');return;}
 const UP=${JSON.stringify(WL_UPPER)},UC=${JSON.stringify(WL_UPPER_CODE)},DASH=${JSON.stringify(dash)};
+let win=null;try{win=window.open('','_blank');if(win)win.document.write('<p style="font:16px sans-serif;padding:24px">워크라인에서 SKY 실적을 세는 중입니다… (10~30초)</p>');}catch(e){win=null;}
 const box=document.createElement('div');box.style.cssText='position:fixed;z-index:99999;right:16px;top:16px;background:#1c2230;color:#fff;padding:14px 18px;border-radius:12px;font:14px sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.3)';document.body.appendChild(box);
 const say=t=>box.textContent='SKY 대시보드로 보내는 중 · '+t;
 const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -4724,19 +4760,23 @@ try{
 const kind=r=>r.productName==='인터넷'?'IN':r.productName==='TV'?'TV':null;
 const isOp=s=>s==='개통완료',isX=s=>/취소|반송|해지|철회/.test(s);
 const rng='&dateFrom='+ymd(from)+'&dateTo='+ymd(now);
-const rc=(await all('dealerCode1='+UC+'&dateField=g_date_yuchi'+rng,'접수')).filter(r=>kind(r)&&r.upperPoint===UP);
-const op=(await all('dealerCode1='+UC+'&dateField=g_date_gaetong'+rng,'개통')).filter(r=>kind(r)&&r.upperPoint===UP&&isOp(r.openStatus));
+const okd=x=>/^\\d{4}-\\d{2}/.test(String(x||''));
+const rc=(await all('dealerCode1='+UC+'&dateField=g_date_yuchi'+rng,'접수')).filter(r=>kind(r)&&r.upperPoint===UP&&okd(r.receiptDate));
+const op=(await all('dealerCode1='+UC+'&dateField=g_date_gaetong'+rng,'개통')).filter(r=>kind(r)&&r.upperPoint===UP&&isOp(r.openStatus)&&okd(r.openDate)&&okd(r.receiptDate));
 const M={};const m=k=>M[k]=M[k]||{rcvIN:0,rcvTV:0,opIN:0,opTV:0,okIN:0,okTV:0,xIN:0,xTV:0,pendIN:0,pendTV:0};
 for(let d=new Date(from);d<=now;d=new Date(d.getFullYear(),d.getMonth()+1,1))m(d.getFullYear()+'-'+pad(d.getMonth()+1));
-rc.forEach(r=>{const k=kind(r),o=m(String(r.receiptDate).slice(0,7));o['rcv'+k]++;if(isOp(r.openStatus))o['ok'+k]++;else if(isX(r.openStatus))o['x'+k]++;else o['pend'+k]++;});
-op.forEach(r=>{const k=kind(r);if(k==='TV'&&/^\\(추단\\)/.test(r.option||''))return;m(String(r.openDate).slice(0,7))['op'+k]++;});
+const rk=r=>(r.customerName||'')+'|'+String(r.receiptDate).slice(0,10);const homeR=new Set(rc.filter(r=>kind(r)==='IN'&&/홈30%/.test(r.option||'')).map(rk));
+rc.forEach(r=>{const k=kind(r);if(k==='TV'&&/^\\(추단\\)/.test(r.option||'')&&homeR.has(rk(r)))return;const o=m(String(r.receiptDate).slice(0,7));o['rcv'+k]++;if(isOp(r.openStatus))o['ok'+k]++;else if(isX(r.openStatus))o['x'+k]++;else o['pend'+k]++;});
+const ck=r=>(r.customerName||'')+'|'+r.openDate;const home=new Set(op.filter(r=>kind(r)==='IN'&&/홈30%/.test(r.option||'')).map(ck));
+op.forEach(r=>{const k=kind(r);if(k==='TV'&&/^\\(추단\\)/.test(r.option||'')&&home.has(ck(r)))return;m(String(r.openDate).slice(0,7))['op'+k]++;});
 const lag=op.map(r=>Math.round((new Date(r.openDate)-new Date(String(r.receiptDate).slice(0,10)))/864e5)).filter(x=>x>=0).sort((a,b)=>a-b);
 const share={};const sky=await all('articleIdx1=844&dateField=g_date_yuchi'+rng,'SKYLIFE 전체');
-sky.filter(kind).forEach(r=>{const k=String(r.receiptDate).slice(0,7),u=r.upperPoint||'(없음)';(share[k]=share[k]||{})[u]=(share[k][u]||0)+1;});
+sky.filter(r=>kind(r)&&okd(r.receiptDate)).forEach(r=>{const k=String(r.receiptDate).slice(0,7),u=r.upperPoint||'(없음)';(share[k]=share[k]||{})[u]=(share[k][u]||0)+1;});
 const pay={v:1,at:now.toISOString(),upper:UP,months:M,lag:{n:lag.length,med:lag.length?lag[Math.floor(lag.length/2)]:null,p25:lag.length?lag[Math.floor(lag.length*.25)]:null,p75:lag.length?lag[Math.floor(lag.length*.75)]:null},share};
-say('완료 — 대시보드를 엽니다');setTimeout(()=>box.remove(),2500);
-window.open(DASH+'#wl='+encodeURIComponent(JSON.stringify(pay)),'_blank');
-}catch(e){box.style.background='#c8373c';box.textContent='가져오지 못했습니다: '+e.message;setTimeout(()=>box.remove(),6000);}
+const url=DASH+'#wl='+encodeURIComponent(JSON.stringify(pay));
+if(win&&!win.closed){win.location.href=url;say('완료 — 대시보드 탭에서 확인하세요');setTimeout(()=>box.remove(),4000);}
+else{box.textContent='';const a=document.createElement('a');a.href=url;a.target='_blank';a.textContent='다 셌습니다 — 여기를 눌러 대시보드 열기';a.style.cssText='color:#fff;font-weight:700';a.onclick=()=>setTimeout(()=>box.remove(),500);box.appendChild(a);}
+}catch(e){try{if(win)win.close();}catch(_){}box.style.background='#c8373c';box.textContent='가져오지 못했습니다: '+e.message;setTimeout(()=>box.remove(),6000);}
 })()`;
   return 'javascript:'+encodeURIComponent(code.replace(/\n/g,''));
 }
@@ -4760,6 +4800,7 @@ function openWlHelp(){
     + '<div class="wl-card"><div class="wl-n">3</div><div><b>대시보드에 저장</b>'
       + '<p>끝나면 대시보드가 새 탭으로 열리고, <b>관리자(admin)로 로그인돼 있으면</b> 바로 저장됩니다. 로그인 전이면 로그인하는 순간 저장돼요.</p></div></div>'
     + '<p class="hint" style="margin:12px 0 0">상부점 <b>'+esc(WL_UPPER)+'</b> 건을 최근 6개월 동안 <b>건수로만</b> 셉니다. 고객 이름 · 연락처는 대시보드로 오지 않습니다.'
+    + '<br>인터넷 = 상품명 <b>인터넷</b> 행, TV = 상품명 <b>TV</b> 행만 셉니다 (부가상품 · 관리 · 정산 행은 제외). 접수는 접수일, 개통은 개통일 기준 <b>개통완료</b> 건이고, TV 개통에서 홈30% 세트 안의 (추단)은 뺍니다 — 정산 자료 계산과 같은 규칙입니다.'
     + (wl? '<br>마지막으로 가져온 때: <b>'+esc(fmtDate(wl.at))+'</b>'+(wl.by?' · '+esc(wl.by):''):'')+'</p>'
     + '</div>', {wide:true});
 }
@@ -4769,20 +4810,24 @@ async function wlCopyBm(btn){
   catch(e){ prompt('아래 내용을 모두 복사하세요 (Ctrl+C)', src); }
 }
 /* 주소 #wl=… 로 들어온 자료 */
-let _wlPending=null;
+let _wlPending=null, _wlBusy=false;
 function wlTakeHash(){
   const h=location.hash||''; if(!h.startsWith('#wl=')) return;
-  try{ const p=JSON.parse(decodeURIComponent(h.slice(4))); if(p&&p.v===1&&p.months) _wlPending=p; }catch(e){ console.warn('워크라인 자료 해석 실패',e); }
+  try{ _wlPending=wlClean(JSON.parse(decodeURIComponent(h.slice(4)))); }catch(e){ console.warn('워크라인 자료 해석 실패',e); }
   try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
 }
 async function wlFlush(){
-  if(!_wlPending) return;
+  if(!_wlPending||_wlBusy) return;
   const p=_wlPending, ms=Object.keys(p.months).sort(), last=ms[ms.length-1], lm=last?p.months[last]:null;
   const sum='최근 '+ms.length+'개월 · '+(last?(+last.slice(5))+'월 접수 '+fmtN((lm.rcvIN||0)+(lm.rcvTV||0))+'건 · 개통 인터넷 '+fmtN(lm.opIN||0)+' / TV '+fmtN(lm.opTV||0):'');
   if(!canEdit()){ showGsStatus('워크라인 자료가 도착했습니다 — 관리자로 로그인하면 저장됩니다 ('+sum+')'); return; }
-  const ok=await sbSaveSetting('wl',{...p, by:userLabel(sbUser), savedAt:new Date().toISOString()});
-  if(!ok){ showGsStatus('⚠ 워크라인 자료를 저장하지 못했습니다',false); return; }
-  _wlPending=null;
+  _wlBusy=true;
+  try{
+    if(!confirm('워크라인 자료를 저장할까요?\n\n'+fmtDate(p.at)+' 기준 · '+sum)){ _wlPending=null; return; }
+    const ok=await sbSaveSetting('wl',{...p, by:String(userLabel(sbUser)).slice(0,40), savedAt:new Date().toISOString()});
+    if(!ok){ showGsStatus('⚠ 워크라인 자료를 저장하지 못했습니다',false); return; }
+    _wlPending=null;
+  }finally{ _wlBusy=false; }
   showGsStatus('워크라인 자료를 반영했습니다 · '+sum);
   try{ const pg=(document.querySelector('.page.on')||{}).id||''; if(pg==='page-grade') renderGrade(); if(pg==='page-compare'&&cmTab==='board') renderBoard(); }catch(e){}
 }
