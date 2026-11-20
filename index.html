@@ -39,7 +39,9 @@ a{color:inherit}
 /* ── 레이아웃 ─────────────────────────────────────────── */
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 #main,.main{min-width:0;display:flex;flex-direction:column}
-.content{padding:24px 32px 60px;max-width:1880px;width:100%;box-sizing:border-box}
+.content{padding:24px 32px 60px;max-width:1460px;width:100%;box-sizing:border-box}
+/* 표가 넓은 페이지만 화면을 더 쓴다 (수수료표 · 그레이드 단가). 나머지는 읽기 좋은 폭 유지 */
+body[data-pg="table"] .content,body[data-pg="grade"] .content{max-width:1880px}
 .page{display:none}.page.on{display:block}
 
 /* ── 사이드바 ─────────────────────────────────────────── */
@@ -3685,6 +3687,7 @@ function go(pg){
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
   const pageEl=document.getElementById('page-'+pg);
   const navEl=document.getElementById('nav-'+pg);
+  document.body.dataset.pg=pg;
   if(pageEl) pageEl.classList.add('on');
   if(navEl) navEl.classList.add('on');
   const titleEl=document.getElementById('tb-title');
