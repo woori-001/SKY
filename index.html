@@ -39,7 +39,7 @@ a{color:inherit}
 /* ── 레이아웃 ─────────────────────────────────────────── */
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 #main,.main{min-width:0;display:flex;flex-direction:column}
-.content{padding:24px 32px 60px;max-width:1460px;width:100%}
+.content{padding:24px 32px 60px;max-width:1880px;width:100%;box-sizing:border-box}
 .page{display:none}.page.on{display:block}
 
 /* ── 사이드바 ─────────────────────────────────────────── */
@@ -678,8 +678,10 @@ body.mode-report .mp-m.on.has::after{background:var(--acc)}
 .strip .sp{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
 
 /* 시장 · 판단 */
-.pol-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px!important;margin-bottom:12px;font-size:13px}
-.pol-strip:empty{display:none}
+.cmp-tools{padding:12px 18px!important}
+.cmp-meta{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line2);font-size:12.5px;color:var(--sub)}
+.cmp-meta b{color:var(--text)}
+.pol-strip{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pol-ic{width:24px;height:24px;border-radius:7px;background:#e8f3ff;color:#2a6fd6;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
 .pol-new{color:#127a45;background:#e3f6ea;border-radius:6px;padding:1px 7px;font-size:11.5px}
 .pol-pv{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px}
@@ -1139,13 +1141,7 @@ window.SKY_CONFIG = {
       </div>
       <div id="cm-board" hidden></div>
       <div id="cm-input">
-        <div class="card pol-strip" id="pol-strip"></div>
         <div id="cmp-wrap">
-
-          <div class="strip">
-            <span class="ib c2" style="margin:0"><svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 16 16"><path d="M2 8h5M9 8h5M8 3v13M3 5h4M9 5h4"/></svg></span>
-            <span id="cmp-grade-info"></span>
-          </div>
           <div id="cmp-table-wrap"></div>
 
         </div>
@@ -4296,10 +4292,10 @@ async function removeCompareSource(id){
 function renderCompare(){
   const wrap = document.getElementById('cmp-table-wrap');
   if(!wrap) return;
-  const gradeEl = document.getElementById('cmp-grade-info');
-  if(gradeEl){
+  let gradeInfo='';
+  {
     const mxName = SKY.activeMx ? ' · '+esc(SKY.activeMx.label) : '';
-    gradeEl.innerHTML = gradeU>0
+    gradeInfo = gradeU>0
       ? '우리 수수료는 <b>상품권 포함</b>, 그레이드 '+(selIN&&selTV? '<b>'+fmtN(selIN)+'×'+fmtN(selTV)+'건</b> ':'')
         +'단가 <b>+'+fmtN(gradeU)+'원</b> 포함'+mxName
       : '우리 수수료는 <b>상품권 포함</b> · 그레이드 목표를 아직 안 잡아서 그레이드는 빠져 있습니다'+mxName;
@@ -4335,14 +4331,14 @@ function renderCompare(){
   const diffCell=(d,m)=> !m ? '<span class="dim small">미입력</span>'
       : '<b class="'+(d>0?'cp':d<0?'cn':'dim')+'">'+(d>0?'+':'')+fmtN(d)+'</b>';
 
-  // 다른 상부 칸
-  let h='<div class="card" style="padding:14px 18px"><div class="srcbar"><span class="lbl">다른 상부 비교 칸</span>'
+  // 한 카드 : 비교 칸(상부) / 우리 수수료 기준 · 상부정책 불러오기
+  let h='<div class="card cmp-tools"><div class="srcbar"><span class="lbl">다른 상부 비교 칸</span>'
     + (SRC.length ? SRC.map(s=>'<span class="ptag"><span'+(ro?'':' style="cursor:pointer" onclick="renameCompareSource('+s.id+')" title="이름 바꾸기"')+'>'+esc(s.name)+'</span>'
         +(ro?'':'<button class="ptag-rm" onclick="removeCompareSource('+s.id+')" title="칸 지우기">✕</button>')+'</span>').join('')
        : '<span class="hint">아직 없습니다</span>')
     + (ro? '<span class="hint" style="margin-left:auto">로그인하면 칸을 추가할 수 있습니다</span>'
          : '<button class="ghost sm" style="margin-left:auto" onclick="addCompareSource()">+ 상부 추가</button>')
-    + '</div></div>';
+    + '</div><div class="cmp-meta"><span class="cmp-gi">'+gradeInfo+'</span><span class="pol-strip" id="pol-strip">'+_polStripHtml+'</span></div></div>';
 
   groups.forEach(g=>{
     const span={}; g.rows.forEach(r=>span[r.tv]=(span[r.tv]||0)+1);
@@ -4709,19 +4705,20 @@ function polMap(P){
   return {cells:[...seen.values()], unmatched, vend};
 }
 function polImportInfo(ym){ return (SKY.settings||{})['policy_import:'+ym]||null; }
+let _polStripHtml='';
+function polStripSet(html){ _polStripHtml=html; const el=document.getElementById('pol-strip'); if(el) el.innerHTML=html; }
 async function polStripRefresh(){
-  const el=document.getElementById('pol-strip'); if(!el) return;
-  if(!canEdit()){ el.innerHTML='<span class="hint">상부정책(SKY › 유선)에서 시장가를 불러오려면 관리자로 로그인하세요.</span>'; return; }
+  const el={set innerHTML(v){ polStripSet(v); }};
+  if(!canEdit()){ el.innerHTML='<span class="dim">상부정책 불러오기는 관리자 로그인 후</span>'; return; }
   const ym=curMonthKey();
   el.innerHTML='<span class="hint">상부정책 확인 중…</span>';
   try{ await polFetch(ym); }catch(e){ el.innerHTML='<span class="hint">상부정책을 읽지 못했습니다: '+esc(e.message)+'</span>'; return; }
   const P=_polInfo, last=polImportInfo(ym);
   if(P.none){ el.innerHTML='<span class="hint">상부정책에 '+(+ym.slice(5))+'월 SKY 단가가 아직 없습니다.</span>'; return; }
   const fresh= !last || last.saved_at!==P.saved_at || last.eff_at!==P.eff_at;
-  el.innerHTML='<span class="pol-ic">⇣</span><span>상부정책 <b>'+esc(String(P.eff_at||'').slice(5,16).replace('-','/'))+' 적용분</b> <span class="dim">('+esc(P.author||'')+' · '+esc(String(P.saved_at||'').slice(5).replace('-','/'))+' 저장)</span>'
-    + (fresh? ' <b class="pol-new">새 단가</b>' : ' <span class="dim">· 불러온 단가와 같음</span>')
-    + (last? ' <span class="dim">· 마지막 불러오기 '+esc(fmtWhen(last.at).replace(' 수정',''))+'</span>':'')+'</span>'
-    + '<button class="'+(fresh?'primary':'ghost')+' sm" style="margin-left:auto" onclick="polPreview()">불러오기</button>';
+  el.innerHTML='<span title="'+esc((P.author||'')+' · '+String(P.saved_at||'')+' 저장'+(last?' · 마지막 불러오기 '+fmtDate(last.at):''))+'">상부정책 <b>'+esc(String(P.eff_at||'').slice(5,10).replace('-','/'))+' 적용분</b>'
+    + (fresh? ' <b class="pol-new">새 단가</b>' : ' <span class="dim">· 불러온 단가와 같음</span>')+'</span>'
+    + '<button class="'+(fresh?'primary':'ghost')+' sm" onclick="polPreview()">상부정책 불러오기</button>';
 }
 function polPreview(){
   const P=_polInfo; if(!P||P.none) return;
